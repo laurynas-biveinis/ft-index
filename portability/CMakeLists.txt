@@ -55,6 +55,8 @@ if (NOT DEFINED MYSQL_PROJECT_NAME_DOCSTRING)
     DESTINATION ${INSTALL_LIBDIR}
     COMPONENT tokukv_libs_shared
     )
+else ()
+  set_property(SOURCE toku_pthread portability APPEND PROPERTY COMPILE_DEFINITIONS MYSQL_TOKUDB_ENGINE=1 )
 endif ()
 
 add_subdirectory(tests)

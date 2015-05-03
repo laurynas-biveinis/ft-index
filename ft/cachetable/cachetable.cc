@@ -110,6 +110,9 @@ PATENT RIGHTS GRANT:
 #include "util/status.h"
 #include "util/context.h"
 
+pfs_key_t cachetable_m_mutex_key;
+pfs_key_t cachetable_ev_thread_lock_mutex_key;
+
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
 //
@@ -3268,7 +3271,7 @@ void pair_list::init() {
     XCALLOC_N(m_table_size, m_table);
     XCALLOC_N(m_num_locks, m_mutexes);
     for (uint64_t i = 0; i < m_num_locks; i++) {
-        toku_mutex_init(&m_mutexes[i].aligned_mutex, NULL);
+        toku_mutex_init(cachetable_m_mutex_key, &m_mutexes[i].aligned_mutex, NULL);
     }
 }
 
@@ -3658,7 +3661,7 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_pl = _pl;
     m_cf_list = _cf_list;
     m_kibbutz = _kibbutz;    
-    toku_mutex_init(&m_ev_thread_lock, NULL);
+    toku_mutex_init(cachetable_ev_thread_lock_mutex_key, &m_ev_thread_lock, NULL);
     toku_cond_init(&m_flow_control_cond, NULL);
     toku_cond_init(&m_ev_thread_cond, NULL);
     m_num_sleepers = 0;    

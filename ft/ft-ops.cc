@@ -240,6 +240,7 @@ static FT_STATUS_S ft_status;
 #define STATUS_INIT(k,c,t,l,inc) TOKUFT_STATUS_INIT(ft_status, k, c, t, "ft: " l, inc)
 
 static toku_mutex_t ft_open_close_lock;
+pfs_key_t ft_open_close_lock_mutex_key;
 
 static void
 status_init(void)
@@ -4541,7 +4542,7 @@ int toku_ft_layer_init(void) {
     toku_ule_status_init();
     toku_checkpoint_init();
     toku_ft_serialize_layer_init();
-    toku_mutex_init(&ft_open_close_lock, NULL);
+    toku_mutex_init(ft_open_close_lock_mutex_key, &ft_open_close_lock, NULL);
     toku_scoped_malloc_init();
 exit:
     return r;

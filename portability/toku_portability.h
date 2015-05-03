@@ -236,8 +236,10 @@ extern void *realloc(void*, size_t)            __THROW __attribute__((__deprecat
 # pragma GCC poison u_int32_t
 # pragma GCC poison u_int64_t
 # pragma GCC poison BOOL
+#if !defined(MYSQL_TOKUDB_ENGINE)
 # pragma GCC poison FALSE
 # pragma GCC poison TRUE
+#endif /* MYSQL_TOKUDB_ENGINE */
 #endif
 #pragma GCC poison __sync_fetch_and_add
 #pragma GCC poison __sync_fetch_and_sub

@@ -139,6 +139,8 @@ PATENT RIGHTS GRANT:
 #include "util/frwlock.h"
 #include "util/status.h"
 
+pfs_key_t checkpoint_safe_mutex_key;
+
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
 //
@@ -242,7 +244,7 @@ multi_operation_checkpoint_unlock(void) {
 
 static void
 checkpoint_safe_lock_init(void) {
-    toku_mutex_init(&checkpoint_safe_mutex, NULL);
+    toku_mutex_init(checkpoint_safe_mutex_key, &checkpoint_safe_mutex, NULL);
     checkpoint_safe_lock.init(&checkpoint_safe_mutex);
     locked_cs = false;
 }

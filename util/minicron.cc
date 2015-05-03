@@ -95,6 +95,8 @@ PATENT RIGHTS GRANT:
 #include "portability/toku_assert.h"
 #include "util/minicron.h"
 
+pfs_key_t minicron_p_mutex_key;
+
 static void
 toku_gettime (toku_timespec_t *a) {
     struct timeval tv;
@@ -192,7 +194,7 @@ toku_minicron_setup(struct minicron *p, uint32_t period_in_ms, int(*f)(void *), 
     //printf("now=%.6f", p->time_of_last_call_to_f.tv_sec + p->time_of_last_call_to_f.tv_nsec*1e-9);
     p->period_in_ms = period_in_ms; 
     p->do_shutdown = false;
-    toku_mutex_init(&p->mutex, 0);
+    toku_mutex_init(minicron_p_mutex_key, &p->mutex, 0);
     toku_cond_init (&p->condvar, 0);
     return toku_pthread_create(&p->thread, 0, minicron_do, p);
 }

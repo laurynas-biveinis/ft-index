@@ -1826,7 +1826,7 @@ static int run_workers(
     int r;
     const struct perf_formatter *perf_formatter = &perf_formatters[cli_args->perf_output_format];
     toku_mutex_t mutex = ZERO_MUTEX_INITIALIZER;
-    toku_mutex_init(&mutex, nullptr);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&mutex, nullptr);
     struct rwlock rwlock;
     rwlock_init(&rwlock);
     toku_pthread_t tids[num_threads];
@@ -1869,7 +1869,7 @@ static int run_workers(
         // threads (i.e. there is some runaway thread).
         struct sleep_and_crash_extra sac_extra;
         ZERO_STRUCT(sac_extra);
-        toku_mutex_init(&sac_extra.mutex, nullptr);
+        toku_mutex_init(PFS_NOT_INSTRUMENTED,&sac_extra.mutex, nullptr);
         toku_cond_init(&sac_extra.cond, nullptr);
         sac_extra.seconds = cli_args->join_timeout;
         sac_extra.is_setup = false;

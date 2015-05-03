@@ -7,6 +7,11 @@ project(TokuDB)
 set(CMAKE_SHARED_LIBRARY_LINK_C_FLAGS "")
 set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
+# detect when we are being built as a subproject
+if (DEFINED MYSQL_PROJECT_NAME_DOCSTRING)
+  add_definitions( -DMYSQL_TOKUDB_ENGINE=1 )
+endif ()
+
 ## Versions of gcc >= 4.9.0 require special version of 'ar' and 'ranlib' for
 ## link-time optimizations to work properly.
 ##

@@ -115,6 +115,10 @@ PATENT RIGHTS GRANT:
 
 #include "util/x1764.h"
 
+pfs_key_t loader_bl_mutex_key;
+pfs_key_t loader_fi_lock_mutex_key;
+pfs_key_t loader_out_mutex_key;
+
 static size_t (*os_fwrite_fun)(const void *,size_t,size_t,FILE*)=NULL;
 void ft_loader_set_os_fwrite (size_t (*fwrite_fun)(const void*,size_t,size_t,FILE*)) {
     os_fwrite_fun=fwrite_fun;
@@ -151,7 +155,7 @@ toku_ft_loader_get_rowset_budget_for_testing (void)
 
 void ft_loader_lock_init(FTLOADER bl) {
     invariant(!bl->mutex_init);
-    toku_mutex_init(&bl->mutex, NULL); 
+    toku_mutex_init(loader_bl_mutex_key, &bl->mutex, NULL); 
     bl->mutex_init = true;
 }
 
@@ -204,7 +208,7 @@ static void cleanup_big_buffer(struct file_info *file) {
 
 int ft_loader_init_file_infos (struct file_infos *fi) {
     int result = 0;
-    toku_mutex_init(&fi->lock, NULL);
+    toku_mutex_init(loader_fi_lock_mutex_key, &fi->lock, NULL);
     fi->n_files = 0;
     fi->n_files_limit = 1;
     fi->n_files_open = 0;
@@ -2230,7 +2234,7 @@ static inline void dbout_init(struct dbout *out, FT ft) {
     out->current_off = 0;
     out->n_translations = out->n_translations_limit = 0;
     out->translation = NULL;
-    toku_mutex_init(&out->mutex, NULL);
+    toku_mutex_init(loader_out_mutex_key, &out->mutex, NULL);
     out->ft = ft;
 }
 

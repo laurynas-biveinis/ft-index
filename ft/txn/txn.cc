@@ -99,6 +99,9 @@ PATENT RIGHTS GRANT:
 #include "ft/txn/txn_manager.h"
 #include "util/status.h"
 
+pfs_key_t txn_lock_mutex_key;
+pfs_key_t txn_state_lock_mutex_key;
+
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
 //
@@ -356,12 +359,12 @@ static txn_child_manager tcm;
         result->child_manager = parent_tokutxn->child_manager;
     }
 
-    toku_mutex_init(&result->txn_lock, nullptr);
+    toku_mutex_init(txn_lock_mutex_key,&result->txn_lock, nullptr);
 
     toku_pthread_mutexattr_t attr;
     toku_mutexattr_init(&attr);
     toku_mutexattr_settype(&attr, TOKU_MUTEX_ADAPTIVE);
-    toku_mutex_init(&result->state_lock, &attr);
+    toku_mutex_init(txn_state_lock_mutex_key,&result->state_lock, &attr);
     toku_mutexattr_destroy(&attr);
 
     toku_cond_init(&result->state_cond, nullptr);

@@ -101,6 +101,8 @@ PATENT RIGHTS GRANT:
 #include "loader/dbufio.h"
 #include "loader/loader-internal.h"
 
+pfs_key_t bfs_mutex_key;
+
 struct dbufio_file {
     // i/o thread owns these
     int fd;
@@ -431,7 +433,7 @@ int create_dbufio_fileset (DBUFIO_FILESET *bfsp, int N, int fds[/*N*/], size_t b
     }
     //printf("%s:%d here\n", __FILE__, __LINE__);
     if (result==0) {
-	toku_mutex_init(&bfs->mutex, NULL);
+	toku_mutex_init(bfs_mutex_key, &bfs->mutex, NULL);
 	mutex_inited = true;
     }
     if (result==0) {

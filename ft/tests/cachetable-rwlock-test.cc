@@ -151,7 +151,7 @@ static void
 rw_event_init (struct rw_event *rwe) {
     rwe->e = 0;
     rwlock_init(&rwe->the_rwlock);
-    toku_mutex_init(&rwe->mutex, 0);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&rwe->mutex, 0);
 }
 
 static void
