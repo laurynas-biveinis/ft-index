@@ -114,8 +114,8 @@ typedef struct timespec toku_timespec_t;
 typedef unsigned int    pfs_key_t;
 
 
-//#undef HAVE_PSI_RWLOCK_INTERFACE
-//#undef HAVE_PSI_COND_INTERFACE
+#undef HAVE_PSI_RWLOCK_INTERFACE
+#undef HAVE_PSI_COND_INTERFACE
 //#undef HAVE_PSI_MUTEX_INTERFACE
 
 #ifndef TOKU_PTHREAD_DEBUG
@@ -231,8 +231,11 @@ extern toku_mutex_t probe_mutex_4;
 # define ZERO_COND_INITIALIZER {{{0}}}
 #endif
 
-#define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond = 0 }
- 
+#ifdef HAVE_PSI_COND_INTERFACE
+  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond = 0 }
+#else
+  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER }
+#endif
 
 static inline void
 toku_mutexattr_init(toku_pthread_mutexattr_t *attr) {

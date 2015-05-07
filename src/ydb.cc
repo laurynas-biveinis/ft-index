@@ -1218,10 +1218,10 @@ env_close(DB_ENV * env, uint32_t flags) {
     toku_pthread_rwlock_destroy(&env->i->open_dbs_rwlock);
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
-    toku_mutex_destroy(&probe_mutex_4);
-    toku_mutex_destroy(&probe_mutex_3);    
-    toku_mutex_destroy(&probe_mutex_2);
-    toku_mutex_destroy(&probe_mutex_1);
+//    toku_mutex_destroy(&probe_mutex_4);
+//    toku_mutex_destroy(&probe_mutex_3);    
+//    toku_mutex_destroy(&probe_mutex_2);
+//    toku_mutex_destroy(&probe_mutex_1);
 #endif        
 
     // Immediately before freeing internal environment unlock the directories
@@ -2586,6 +2586,14 @@ toku_env_create(DB_ENV ** envp, uint32_t flags) {
     if (result == 0) { r = ENOMEM; goto cleanup; }
     memset(result, 0, sizeof *result);
 
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+//    toku_mutex_init(probe_mutex_1_key, &probe_mutex_1, NULL);
+//    toku_mutex_init(probe_mutex_2_key, &probe_mutex_2, NULL);    
+//    toku_mutex_init(probe_mutex_3_key, &probe_mutex_3, NULL);
+//    toku_mutex_init(probe_mutex_4_key, &probe_mutex_4, NULL);
+#endif        
+
+
     // locked methods
     result->err = (void (*)(const DB_ENV * env, int error, const char *fmt, ...)) toku_env_err;
 #define SENV(name) result->name = locked_env_ ## name
@@ -2694,12 +2702,6 @@ toku_env_create(DB_ENV ** envp, uint32_t flags) {
     result->i->open_dbs_by_dname->create();
     XMALLOC(result->i->open_dbs_by_dict_id);
     result->i->open_dbs_by_dict_id->create();
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-    toku_mutex_init(probe_mutex_1_key, &probe_mutex_1, NULL);
-    toku_mutex_init(probe_mutex_2_key, &probe_mutex_2, NULL);    
-    toku_mutex_init(probe_mutex_3_key, &probe_mutex_3, NULL);
-    toku_mutex_init(probe_mutex_4_key, &probe_mutex_4, NULL);
-#endif        
     toku_pthread_rwlock_init(result_i_open_dbs_rwlock_key,&result->i->open_dbs_rwlock, NULL);
 
     *envp = result;
