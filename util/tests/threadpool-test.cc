@@ -122,7 +122,7 @@ my_threadpool_init (struct my_threadpool *my_threadpool, int max_threads) {
     r = toku_thread_pool_create(&my_threadpool->threadpool, max_threads); assert(r == 0);
     assert(my_threadpool != 0);
     toku_mutex_init(PFS_NOT_INSTRUMENTED,&my_threadpool->mutex, 0);
-    toku_cond_init(&my_threadpool->wait, 0);
+    toku_cond_init(PFS_NOT_INSTRUMENTED,&my_threadpool->wait, 0);
     my_threadpool->closed = 0;
     my_threadpool->counter = 0;
 }

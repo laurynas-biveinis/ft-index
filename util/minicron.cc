@@ -96,6 +96,9 @@ PATENT RIGHTS GRANT:
 #include "util/minicron.h"
 
 pfs_key_t minicron_p_mutex_key;
+pfs_key_t minicron_p_condvar_key;
+
+#define MINCRON_PFS_STUCK 1
 
 static void
 toku_gettime (toku_timespec_t *a) {
@@ -132,7 +135,11 @@ minicron_do (void *pv)
         }
         if (p->period_in_ms == 0) {
             // if we aren't supposed to do it then just do an untimed wait.
+#if MINCRON_PFS_STUCK
+            nonpfs_toku_cond_wait(&p->condvar, &p->mutex);
+#else       
             toku_cond_wait(&p->condvar, &p->mutex);
+#endif            
         } 
         else if (p->period_in_ms <= 1000) {
             toku_mutex_unlock(&p->mutex);
@@ -150,7 +157,11 @@ minicron_do (void *pv)
             // if the time to wakeup has yet to come, then we sleep
             // otherwise, we continue
             if (compare > 0) {
+#if MINCRON_PFS_STUCK
+                int r = nonpfs_toku_cond_timedwait(&p->condvar, &p->mutex, &wakeup_at);
+#else
                 int r = toku_cond_timedwait(&p->condvar, &p->mutex, &wakeup_at);
+#endif
                 if (r!=0 && r!=ETIMEDOUT) fprintf(stderr, "%s:%d r=%d (%s)", __FILE__, __LINE__, r, strerror(r));
                 assert(r==0 || r==ETIMEDOUT);
             }
@@ -195,7 +206,11 @@ toku_minicron_setup(struct minicron *p, uint32_t period_in_ms, int(*f)(void *), 
     p->period_in_ms = period_in_ms; 
     p->do_shutdown = false;
     toku_mutex_init(minicron_p_mutex_key, &p->mutex, 0);
-    toku_cond_init (&p->condvar, 0);
+#if MINCRON_PFS_STUCK
+     nonpfs_toku_cond_init( &p->condvar, 0);
+#else 
+     toku_cond_init(minicron_p_condvar_key, &p->condvar, 0);
+#endif
     return toku_pthread_create(&p->thread, 0, minicron_do, p);
 }
     
@@ -204,7 +219,11 @@ toku_minicron_change_period(struct minicron *p, uint32_t new_period)
 {
     toku_mutex_lock(&p->mutex);
     p->period_in_ms = new_period;
+#if MINCRON_PFS_STUCK
+    nonpfs_toku_cond_signal(&p->condvar);
+#else 
     toku_cond_signal(&p->condvar);
+#endif
     toku_mutex_unlock(&p->mutex);
 }
 
@@ -230,14 +249,22 @@ toku_minicron_shutdown(struct minicron *p) {
     assert(!p->do_shutdown);
     p->do_shutdown = true;
     //printf("%s:%d signalling\n", __FILE__, __LINE__);
+#if MINCRON_PFS_STUCK
+    nonpfs_toku_cond_signal(&p->condvar);
+#else 
     toku_cond_signal(&p->condvar);
+#endif
     toku_mutex_unlock(&p->mutex);
     void *returned_value;
     //printf("%s:%d joining\n", __FILE__, __LINE__);
     int r = toku_pthread_join(p->thread, &returned_value);
     if (r!=0) fprintf(stderr, "%s:%d r=%d (%s)\n", __FILE__, __LINE__, r, strerror(r));
     assert(r==0);  assert(returned_value==0);
+#if MINCRON_PFS_STUCK
+    nonpfs_toku_cond_destroy(&p->condvar);
+#else
     toku_cond_destroy(&p->condvar);
+#endif    
     toku_mutex_destroy(&p->mutex);
     //printf("%s:%d shutdowned\n", __FILE__, __LINE__);
     return 0;

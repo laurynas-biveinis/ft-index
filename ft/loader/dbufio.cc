@@ -102,6 +102,7 @@ PATENT RIGHTS GRANT:
 #include "loader/loader-internal.h"
 
 pfs_key_t bfs_mutex_key;
+pfs_key_t bfs_cond_key;
 
 struct dbufio_file {
     // i/o thread owns these
@@ -437,7 +438,7 @@ int create_dbufio_fileset (DBUFIO_FILESET *bfsp, int N, int fds[/*N*/], size_t b
 	mutex_inited = true;
     }
     if (result==0) {
-	toku_cond_init(&bfs->cond, NULL);
+	toku_cond_init(bfs_cond_key,&bfs->cond, NULL);
 	cond_inited = true;
     }
     if (result==0) {

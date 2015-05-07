@@ -121,13 +121,14 @@ struct kibbutz {
 static void *work_on_kibbutz (void *);
 
 pfs_key_t kibbutz_mutex_key;
+pfs_key_t kibbutz_k_cond_key;
 
 int toku_kibbutz_create (int n_workers, KIBBUTZ *kb_ret) {
     int r = 0;
     *kb_ret = NULL;
     KIBBUTZ XCALLOC(k);
-    toku_mutex_init(kibbutz_mutex_key,&k->mutex, NULL);
-    toku_cond_init(&k->cond, NULL);
+    toku_mutex_init(kibbutz_mutex_key, &k->mutex, NULL);
+    toku_cond_init(kibbutz_k_cond_key, &k->cond, NULL);
     k->please_shutdown = false;
     k->head = NULL;
     k->tail = NULL;

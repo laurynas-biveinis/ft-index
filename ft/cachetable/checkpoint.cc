@@ -140,6 +140,12 @@ PATENT RIGHTS GRANT:
 #include "util/status.h"
 
 pfs_key_t checkpoint_safe_mutex_key;
+pfs_key_t multi_operation_lock_key;
+pfs_key_t low_priority_multi_operation_lock_key;
+
+pfs_key_t rwlock_cond_key;
+pfs_key_t rwlock_wait_read_key;
+pfs_key_t rwlock_wait_write_key;
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
@@ -216,8 +222,8 @@ multi_operation_lock_init(void) {
     // TODO: need to figure out how to make writer-preferential rwlocks
     // happen on osx
 #endif
-    toku_pthread_rwlock_init(&multi_operation_lock, &attr);
-    toku_pthread_rwlock_init(&low_priority_multi_operation_lock, &attr);
+    toku_pthread_rwlock_init(multi_operation_lock_key, &multi_operation_lock, &attr);
+    toku_pthread_rwlock_init(low_priority_multi_operation_lock_key, &low_priority_multi_operation_lock, &attr);
     pthread_rwlockattr_destroy(&attr);
     locked_mo = false;
 }

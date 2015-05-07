@@ -91,6 +91,8 @@ PATENT RIGHTS GRANT:
 
 #include <toku_assert.h>
 
+pfs_key_t treenode_mutex_key;
+
 void concurrent_tree::create(const comparator *cmp) {
     // start with an empty root node. we do this instead of
     // setting m_root to null so there's always a root to lock

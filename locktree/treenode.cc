@@ -91,7 +91,7 @@ PATENT RIGHTS GRANT:
 
 #include <toku_race_tools.h>
 
-pfs_key_t treenode_mutex_key;
+extern pfs_key_t treenode_mutex_key;
 
 void treenode::mutex_lock(void) {
     toku_mutex_lock(&m_mutex);

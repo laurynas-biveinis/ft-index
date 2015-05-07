@@ -152,6 +152,17 @@ env_panic(DB_ENV * env, int cause, const char * msg) {
     env->i->panic_string = toku_strdup(msg);
 }
 
+pfs_key_t result_i_open_dbs_rwlock_key;
+pfs_key_t probe_mutex_1_key;
+pfs_key_t probe_mutex_2_key;
+pfs_key_t probe_mutex_3_key;
+pfs_key_t probe_mutex_4_key;
+
+toku_mutex_t  probe_mutex_1; 
+toku_mutex_t  probe_mutex_2; 
+toku_mutex_t  probe_mutex_3; 
+toku_mutex_t  probe_mutex_4; 
+
 static int env_get_engine_status_num_rows (DB_ENV * UU(env), uint64_t * num_rowsp);
 
 /********************************************************************************
@@ -1205,6 +1216,13 @@ env_close(DB_ENV * env, uint32_t flags) {
     if (env->i->dir)
         toku_free(env->i->dir);
     toku_pthread_rwlock_destroy(&env->i->open_dbs_rwlock);
+
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+    toku_mutex_destroy(&probe_mutex_4);
+    toku_mutex_destroy(&probe_mutex_3);    
+    toku_mutex_destroy(&probe_mutex_2);
+    toku_mutex_destroy(&probe_mutex_1);
+#endif        
 
     // Immediately before freeing internal environment unlock the directories
     unlock_single_process(env);
@@ -2676,7 +2694,13 @@ toku_env_create(DB_ENV ** envp, uint32_t flags) {
     result->i->open_dbs_by_dname->create();
     XMALLOC(result->i->open_dbs_by_dict_id);
     result->i->open_dbs_by_dict_id->create();
-    toku_pthread_rwlock_init(&result->i->open_dbs_rwlock, NULL);
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+    toku_mutex_init(probe_mutex_1_key, &probe_mutex_1, NULL);
+    toku_mutex_init(probe_mutex_2_key, &probe_mutex_2, NULL);    
+    toku_mutex_init(probe_mutex_3_key, &probe_mutex_3, NULL);
+    toku_mutex_init(probe_mutex_4_key, &probe_mutex_4, NULL);
+#endif        
+    toku_pthread_rwlock_init(result_i_open_dbs_rwlock_key,&result->i->open_dbs_rwlock, NULL);
 
     *envp = result;
     r = 0;

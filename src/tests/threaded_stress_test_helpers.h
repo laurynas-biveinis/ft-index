@@ -1870,7 +1870,7 @@ static int run_workers(
         struct sleep_and_crash_extra sac_extra;
         ZERO_STRUCT(sac_extra);
         toku_mutex_init(PFS_NOT_INSTRUMENTED,&sac_extra.mutex, nullptr);
-        toku_cond_init(&sac_extra.cond, nullptr);
+        toku_cond_init(PFS_NOT_INSTRUMENTED,&sac_extra.cond, nullptr);
         sac_extra.seconds = cli_args->join_timeout;
         sac_extra.is_setup = false;
         sac_extra.threads_have_joined = false;

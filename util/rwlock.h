@@ -200,6 +200,11 @@ PATENT RIGHTS GRANT:
 // increase parallelism at the expense of single thread performance, we
 // are experimenting with a single higher level lock.
 
+
+extern pfs_key_t rwlock_cond_key;
+extern pfs_key_t rwlock_wait_read_key;    
+extern pfs_key_t rwlock_wait_write_key;
+
 typedef struct rwlock *RWLOCK;
 struct rwlock {
     int reader;                  // the number of readers
@@ -219,14 +224,13 @@ static inline int rwlock_users(RWLOCK rwlock) {
 }
 
 // initialize a read write lock
-
 static __attribute__((__unused__))
 void
 rwlock_init(RWLOCK rwlock) {
     rwlock->reader = rwlock->want_read = 0;
-    toku_cond_init(&rwlock->wait_read, 0);
+    toku_cond_init(rwlock_wait_read_key, &rwlock->wait_read, 0);
     rwlock->writer = rwlock->want_write = 0;
-    toku_cond_init(&rwlock->wait_write, 0);
+    toku_cond_init(rwlock_wait_write_key, &rwlock->wait_write, 0);
     rwlock->wait_users_go_to_zero = NULL;
 }
 
@@ -344,7 +348,7 @@ static inline void rwlock_wait_for_users(
 {
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     toku_cond_t cond;
-    toku_cond_init(&cond, NULL);
+    toku_cond_init(rwlock_cond_key,&cond, NULL);
     while (rwlock_users(rwlock) > 0) {
         rwlock->wait_users_go_to_zero = &cond;
         toku_cond_wait(&cond, mutex);

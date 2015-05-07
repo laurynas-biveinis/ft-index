@@ -111,7 +111,7 @@ struct test_seq {
 static void test_seq_init(struct test_seq *seq) {
     seq->state = 0;
     toku_mutex_init(PFS_NOT_INSTRUMENTED,&seq->lock, NULL);
-    toku_cond_init(&seq->cv, NULL);
+    toku_cond_init(PFS_NOT_INSTRUMENTED,&seq->cv, NULL);
 }
 
 static void test_seq_destroy(struct test_seq *seq) {

@@ -108,12 +108,15 @@ typedef pthread_mutexattr_t toku_pthread_mutexattr_t;
 typedef pthread_mutex_t toku_pthread_mutex_t;
 typedef pthread_condattr_t toku_pthread_condattr_t;
 typedef pthread_cond_t toku_pthread_cond_t;
-typedef pthread_rwlock_t toku_pthread_rwlock_t;
 typedef pthread_rwlockattr_t  toku_pthread_rwlockattr_t;
 typedef pthread_key_t toku_pthread_key_t;
 typedef struct timespec toku_timespec_t;
 typedef unsigned int    pfs_key_t;
 
+
+//#undef HAVE_PSI_RWLOCK_INTERFACE
+//#undef HAVE_PSI_COND_INTERFACE
+//#undef HAVE_PSI_MUTEX_INTERFACE
 
 #ifndef TOKU_PTHREAD_DEBUG
 # define TOKU_PTHREAD_DEBUG 0
@@ -128,7 +131,7 @@ typedef struct toku_mutex {
 #endif
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
-    struct PSI_mutex* toku_psi;      /* The performance schema instrumentation hook */
+    struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
 #endif
 
 } toku_mutex_t;
@@ -136,6 +139,29 @@ typedef struct toku_mutex {
 typedef struct toku_mutex_aligned {
     toku_mutex_t aligned_mutex __attribute__((__aligned__(64)));
 } toku_mutex_aligned_t;
+
+typedef struct toku_cond {
+    pthread_cond_t pcond;
+#ifdef HAVE_PSI_COND_INTERFACE
+    struct PSI_cond *psi_cond;
+#endif
+} toku_cond_t;
+
+typedef struct toku_rwlock {
+    pthread_rwlock_t rwlock;
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    struct PSI_rwlock *psi_rwlock;
+#endif
+} toku_pfs_rwlock_t;
+
+typedef toku_pfs_rwlock_t toku_pthread_rwlock_t;
+
+/* Mutexes for PFS probes */
+extern toku_mutex_t probe_mutex_1;
+extern toku_mutex_t probe_mutex_2;
+extern toku_mutex_t probe_mutex_3;
+extern toku_mutex_t probe_mutex_4;
+
 
 // Different OSes implement mutexes as different amounts of nested structs.
 // C++ will fill out all missing values with zeroes if you provide at least one zero, but it needs the right amount of nesting.
@@ -150,13 +176,13 @@ typedef struct toku_mutex_aligned {
 
 #if TOKU_PTHREAD_DEBUG
 # ifdef HAVE_PSI_MUTEX_INTERFACE
-#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true, .toku_psi = 0 }
+#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true, .psi_mutex = 0 }
 # else
 #  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true }
 # endif
 #else
 # ifdef HAVE_PSI_MUTEX_INTERFACE 
-#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .toku_psi = 0 }
+#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .psi_mutex = 0 }
 # else
 #  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER }
 # endif
@@ -167,9 +193,9 @@ typedef struct toku_mutex_aligned {
 # define TOKU_MUTEX_ADAPTIVE PTHREAD_MUTEX_DEFAULT
 # ifdef HAVE_PSI_MUTEX_INTERFACE
 #  if TOKU_PTHREAD_DEBUG
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true, .toku_psi = 0 }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true, .psi_mutex = 0 }
 #  else
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .toku_psi = 0 }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .psi_mutex = 0 }
 #  endif
 # else
 #  if TOKU_PTHREAD_DEBUG
@@ -182,9 +208,9 @@ typedef struct toku_mutex_aligned {
 # define TOKU_MUTEX_ADAPTIVE PTHREAD_MUTEX_ADAPTIVE_NP
 # ifdef HAVE_PSI_MUTEX_INTERFACE
 #  if TOKU_PTHREAD_DEBUG
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .owner = 0, .locked = false, .valid = true, .toku_psi = 0 }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .owner = 0, .locked = false, .valid = true, .psi_mutex = 0 }
 #  else
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .toku_psi = 0 }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .psi_mutex = 0 }
 #  endif
 # else
 #  if TOKU_PTHREAD_DEBUG
@@ -194,8 +220,19 @@ typedef struct toku_mutex_aligned {
 #  endif
 # endif
 #endif
- 
 
+// Different OSes implement mutexes as different amounts of nested structs.
+// C++ will fill out all missing values with zeroes if you provide at least one zero, but it needs the right amount of nesting.
+#if defined(__FreeBSD__)
+# define ZERO_COND_INITIALIZER {0}
+#elif defined(__APPLE__)
+# define ZERO_COND_INITIALIZER {{0}}
+#else // __linux__, at least
+# define ZERO_COND_INITIALIZER {{{0}}}
+#endif
+
+#define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond = 0 }
+ 
 
 static inline void
 toku_mutexattr_init(toku_pthread_mutexattr_t *attr) {
@@ -214,6 +251,38 @@ toku_mutexattr_destroy(toku_pthread_mutexattr_t *attr) {
     int r = pthread_mutexattr_destroy(attr);
     assert_zero(r);
 }
+
+#if TOKU_PTHREAD_DEBUG
+static inline void
+toku_mutex_assert_locked(const toku_mutex_t *mutex) {
+    invariant(mutex->locked);
+    invariant(mutex->owner == pthread_self());
+}
+#else
+static inline void
+toku_mutex_assert_locked(const toku_mutex_t *mutex __attribute__((unused))) {
+}
+#endif
+
+// asserting that a mutex is unlocked only makes sense
+// if the calling thread can guaruntee that no other threads
+// are trying to lock this mutex at the time of the assertion
+// 
+// a good example of this is a tree with mutexes on each node.
+// when a node is locked the caller knows that no other threads
+// can be trying to lock its childrens' mutexes. the children
+// are in one of two fixed states: locked or unlocked.
+#if TOKU_PTHREAD_DEBUG
+static inline void
+toku_mutex_assert_unlocked(toku_mutex_t *mutex) {
+    invariant(mutex->owner == 0);
+    invariant(!mutex->locked);
+}
+#else
+static inline void
+toku_mutex_assert_unlocked(toku_mutex_t *mutex __attribute__((unused))) {
+}
+#endif
 
 
 #ifdef TOKU_PTHREAD_OLD
@@ -282,303 +351,12 @@ toku_mutex_unlock(toku_mutex_t *mutex) {
     assert_zero(r);
 }
 
-#else /* TOKU_PTHREAD_OLD */
-
-#define ULINT32_UNDEFINED              0xFFFFFFFF
-#define PFS_NOT_INSTRUMENTED           ULINT32_UNDEFINED
-
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-    #define toku_mutex_init(K, M, A) \
-      inline_toku_mutex_init(K, M, A)
-#else
-    #define toku_mutex_init(K, M, A) \
-      inline_toku_mutex_init(M, A)
-#endif
-
-#define toku_mutex_destroy(M) \
-    inline_toku_mutex_destroy(M)
-
-#if defined (HAVE_PSI_MUTEX_INTERFACE)
-  #define toku_mutex_lock(M) \
-    inline_toku_mutex_lock(M, __FILE__, __LINE__)
-#else
-  #define toku_mutex_lock(M) \
-    inline_toku_mutex_lock(M) 
-#endif
-
-
-#if defined (HAVE_PSI_MUTEX_INTERFACE)
-  #define toku_mutex_trylock(M) \
-    inline_toku_mutex_trylock(M, __FILE__, __LINE__)
-#else
-  #define toku_mutex_trylock(M) \
-    inline_toku_mutex_trylock(M) 
-#endif
-
-#define toku_mutex_unlock(M) \
-    inline_toku_mutex_unlock(M) 
-
-
- 
-static inline void inline_toku_mutex_unlock(toku_mutex_t *mutex)   
-{     
-
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->owner == pthread_self());
-    invariant(mutex->valid);
-    invariant(mutex->locked);
-    mutex->locked = false;   
-    mutex->owner = 0;
-#endif
-
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-if (mutex->toku_psi != NULL)  
-     PSI_MUTEX_CALL(unlock_mutex)(mutex->toku_psi);
-#endif
-
-    int r = pthread_mutex_unlock(&mutex->pmutex);
-    assert_zero(r);
-}
-
-
-static inline void inline_toku_mutex_destroy(
-  toku_mutex_t *mutex
-  )   
-{     
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->valid);
-    mutex->valid = false;
-    invariant(!mutex->locked);
-#endif
-
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-  if (mutex->toku_psi != NULL)
-  {
-    PSI_MUTEX_CALL(destroy_mutex)(mutex->toku_psi);
-    mutex->toku_psi= NULL;
-  }
-#endif
-    int r = pthread_mutex_destroy(&mutex->pmutex);
-    assert_zero(r);
-}
-
-static inline void inline_toku_mutex_lock(
-  toku_mutex_t *mutex
-#if defined (HAVE_PSI_MUTEX_INTERFACE)
-  , const char *src_file, uint src_line
-#endif
-  )   
-{     
-  int r=0;
-
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-  if (mutex->toku_psi != NULL)
-  {
-    /* Instrumentation start */
-    PSI_mutex_locker *locker;  
-    PSI_mutex_locker_state state;
-    locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, mutex->toku_psi,
-                                       PSI_MUTEX_LOCK, src_file, src_line);
-  /* Instrumented code */
-  r = pthread_mutex_lock(&mutex->pmutex);
-
-  /* Instrumentation end */
-  if (locker != NULL)
-      PSI_MUTEX_CALL(end_mutex_wait)(locker, r);
-  }
-  else
-    r = pthread_mutex_lock(&mutex->pmutex);
-#else
-  r = pthread_mutex_lock(&mutex->pmutex);
-#endif
-
-    assert_zero(r);
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->valid);
-    invariant(!mutex->locked);
-    invariant(mutex->owner == 0);
-    mutex->locked = true;
-    mutex->owner = pthread_self();
-#endif
-
-}
-
-static inline int inline_toku_mutex_trylock(
-  toku_mutex_t *mutex
-#if defined (HAVE_PSI_MUTEX_INTERFACE)
-  , const char *src_file, uint src_line
-#endif
-  )   
-{   
-  int r=0;  
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-  if (mutex->toku_psi != NULL)
-  {
-    /* Instrumentation start */
-    PSI_mutex_locker *locker;  
-    PSI_mutex_locker_state state;
-    locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, mutex->toku_psi,
-                                       PSI_MUTEX_TRYLOCK, src_file, src_line);
-
-    /* Instrumented code */
-    r= pthread_mutex_trylock(&mutex->pmutex);
-
-    /* Instrumentation end */
-    if (locker != NULL)
-      PSI_MUTEX_CALL(end_mutex_wait)(locker, r);
-
-  }
-  else
-    r= pthread_mutex_trylock(&mutex->pmutex);
-#else
-    r= pthread_mutex_trylock(&mutex->pmutex);
-#endif
-
-#if TOKU_PTHREAD_DEBUG
-    if (r == 0) {  
-        invariant(mutex->valid);
-        invariant(!mutex->locked);
-        invariant(mutex->owner == 0);
-        mutex->locked = true;
-        mutex->owner = pthread_self();
-    }
-#endif
-    return r;
-}
- 
-static inline void inline_toku_mutex_init(
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-  PSI_mutex_key key,
-#endif
-  toku_mutex_t *mutex,
-  const toku_pthread_mutexattr_t *attr
-  )
-{
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-    mutex->toku_psi= PSI_MUTEX_CALL(init_mutex)(key, &mutex->pmutex);
-#endif
-    int r = pthread_mutex_init(&mutex->pmutex, attr);
-    assert_zero(r);   
-#if TOKU_PTHREAD_DEBUG
-    mutex->locked = false;   
-    invariant(!mutex->valid);
-    mutex->valid = true;
-    mutex->owner = 0;
-#endif
-}
-
-#endif /* TOKU_PTHREAD_OLD  */
-
-#if TOKU_PTHREAD_DEBUG
-static inline void
-toku_mutex_assert_locked(const toku_mutex_t *mutex) {
-    invariant(mutex->locked);
-    invariant(mutex->owner == pthread_self());
-}
-#else
-static inline void
-toku_mutex_assert_locked(const toku_mutex_t *mutex __attribute__((unused))) {
-}
-#endif
-
-// asserting that a mutex is unlocked only makes sense
-// if the calling thread can guaruntee that no other threads
-// are trying to lock this mutex at the time of the assertion
-// 
-// a good example of this is a tree with mutexes on each node.
-// when a node is locked the caller knows that no other threads
-// can be trying to lock its childrens' mutexes. the children
-// are in one of two fixed states: locked or unlocked.
-#if TOKU_PTHREAD_DEBUG
-static inline void
-toku_mutex_assert_unlocked(toku_mutex_t *mutex) {
-    invariant(mutex->owner == 0);
-    invariant(!mutex->locked);
-}
-#else
-static inline void
-toku_mutex_assert_unlocked(toku_mutex_t *mutex __attribute__((unused))) {
-}
-#endif
-
-typedef struct toku_cond {
-    pthread_cond_t pcond;
-} toku_cond_t;
-
-// Different OSes implement mutexes as different amounts of nested structs.
-// C++ will fill out all missing values with zeroes if you provide at least one zero, but it needs the right amount of nesting.
-#if defined(__FreeBSD__)
-# define ZERO_COND_INITIALIZER {0}
-#elif defined(__APPLE__)
-# define ZERO_COND_INITIALIZER {{0}}
-#else // __linux__, at least
-# define ZERO_COND_INITIALIZER {{{0}}}
-#endif
-#define TOKU_COND_INITIALIZER {PTHREAD_COND_INITIALIZER}
-
 static inline void
 toku_cond_init(toku_cond_t *cond, const toku_pthread_condattr_t *attr) {
     int r = pthread_cond_init(&cond->pcond, attr);
     assert_zero(r);
 }
 
-static inline void
-toku_cond_destroy(toku_cond_t *cond) {
-    int r = pthread_cond_destroy(&cond->pcond);
-    assert_zero(r);
-}
-
-static inline void
-toku_cond_wait(toku_cond_t *cond, toku_mutex_t *mutex) {
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->locked);
-    mutex->locked = false;
-    mutex->owner = 0;
-#endif
-    int r = pthread_cond_wait(&cond->pcond, &mutex->pmutex);
-    assert_zero(r);
-#if TOKU_PTHREAD_DEBUG
-    invariant(!mutex->locked);
-    mutex->locked = true;
-    mutex->owner = pthread_self();
-#endif
-}
-
-static inline int 
-toku_cond_timedwait(toku_cond_t *cond, toku_mutex_t *mutex, toku_timespec_t *wakeup_at) {
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->locked);
-    mutex->locked = false;
-    mutex->owner = 0;
-#endif
-    int r = pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
-#if TOKU_PTHREAD_DEBUG
-    invariant(!mutex->locked);
-    mutex->locked = true;
-    mutex->owner = pthread_self();
-#endif
-    return r;
-}
-
-static inline void 
-toku_cond_signal(toku_cond_t *cond) {
-    int r = pthread_cond_signal(&cond->pcond);
-    assert_zero(r);
-}
-
-static inline void
-toku_cond_broadcast(toku_cond_t *cond) {
-    int r =pthread_cond_broadcast(&cond->pcond);
-    assert_zero(r);
-}
-
-int 
-toku_pthread_yield(void) __attribute__((__visibility__("default")));
-
-static inline toku_pthread_t 
-toku_pthread_self(void) {
-    return pthread_self();
-}
 
 static inline void
 toku_pthread_rwlock_init(toku_pthread_rwlock_t *__restrict rwlock, const toku_pthread_rwlockattr_t *__restrict attr) {
@@ -616,6 +394,585 @@ toku_pthread_rwlock_wrunlock(toku_pthread_rwlock_t *rwlock) {
     assert_zero(r);
 }
 
+
+#else /* TOKU_PTHREAD_OLD */
+
+#define ULINT32_UNDEFINED              0xFFFFFFFF
+#define PFS_NOT_INSTRUMENTED           ULINT32_UNDEFINED
+
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+    #define toku_mutex_init(K, M, A) \
+      inline_toku_mutex_init(K, M, A)
+#else
+    #define toku_mutex_init(K, M, A) \
+      inline_toku_mutex_init(M, A)
+#endif
+
+#define toku_mutex_destroy(M) \
+    inline_toku_mutex_destroy(M)
+
+#if defined (HAVE_PSI_MUTEX_INTERFACE)
+  #define toku_mutex_lock(M) \
+    inline_toku_mutex_lock(M, __FILE__, __LINE__)
+#else
+  #define toku_mutex_lock(M) \
+    inline_toku_mutex_lock(M) 
+#endif
+
+
+#if defined (HAVE_PSI_MUTEX_INTERFACE)
+  #define toku_mutex_trylock(M) \
+    inline_toku_mutex_trylock(M, __FILE__, __LINE__)
+#else
+  #define toku_mutex_trylock(M) \
+    inline_toku_mutex_trylock(M) 
+#endif
+
+#define toku_mutex_unlock(M) \
+    inline_toku_mutex_unlock(M) 
+
+
+#define probe_start(probe_mutex) \
+        /* Instrumentation start */ \
+        PSI_mutex_locker *locker; \
+        PSI_mutex_locker_state state; \
+        locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, (probe_mutex)->psi_mutex, PSI_MUTEX_LOCK, __FILE__, __LINE__);
+
+#define probe_stop() \
+        /* Instrumentation end */ \
+        if (locker != NULL) \
+           PSI_MUTEX_CALL(end_mutex_wait)(locker, 0);
+
+ 
+static inline void inline_toku_mutex_unlock(toku_mutex_t *mutex)   
+{     
+
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->owner == pthread_self());
+    invariant(mutex->valid);
+    invariant(mutex->locked);
+    mutex->locked = false;   
+    mutex->owner = 0;
+#endif
+
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+if (mutex->psi_mutex != NULL)  
+     PSI_MUTEX_CALL(unlock_mutex)(mutex->psi_mutex);
+#endif
+
+    int r = pthread_mutex_unlock(&mutex->pmutex);
+    assert_zero(r);
+}
+
+
+static inline void inline_toku_mutex_destroy(
+  toku_mutex_t *mutex
+  )   
+{     
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->valid);
+    mutex->valid = false;
+    invariant(!mutex->locked);
+#endif
+
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+  if (mutex->psi_mutex != NULL)
+  {
+    PSI_MUTEX_CALL(destroy_mutex)(mutex->psi_mutex);
+    mutex->psi_mutex= NULL;
+  }
+#endif
+    int r = pthread_mutex_destroy(&mutex->pmutex);
+    assert_zero(r);
+}
+
+
+
+
+static inline void inline_toku_mutex_lock(
+  toku_mutex_t *mutex
+#if defined (HAVE_PSI_MUTEX_INTERFACE)
+  , const char *src_file, uint src_line
+#endif
+  )   
+{     
+  int r=0;
+
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+  if (mutex->psi_mutex != NULL)
+  {
+    /* Instrumentation start */
+    PSI_mutex_locker *locker;  
+    PSI_mutex_locker_state state;
+    locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, mutex->psi_mutex,
+                                       PSI_MUTEX_LOCK, src_file, src_line);
+  /* Instrumented code */
+  r = pthread_mutex_lock(&mutex->pmutex);
+
+  /* Instrumentation end */
+  if (locker != NULL)
+      PSI_MUTEX_CALL(end_mutex_wait)(locker, r);
+  }
+  else
+    r = pthread_mutex_lock(&mutex->pmutex);
+#else
+  r = pthread_mutex_lock(&mutex->pmutex);
+#endif
+
+    assert_zero(r);
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->valid);
+    invariant(!mutex->locked);
+    invariant(mutex->owner == 0);
+    mutex->locked = true;
+    mutex->owner = pthread_self();
+#endif
+
+}
+
+static inline int inline_toku_mutex_trylock(
+  toku_mutex_t *mutex
+#if defined (HAVE_PSI_MUTEX_INTERFACE)
+  , const char *src_file, uint src_line
+#endif
+  )   
+{   
+  int r=0;  
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+  if (mutex->psi_mutex != NULL)
+  {
+    /* Instrumentation start */
+    PSI_mutex_locker *locker;  
+    PSI_mutex_locker_state state;
+    locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, mutex->psi_mutex,
+                                       PSI_MUTEX_TRYLOCK, src_file, src_line);
+
+    /* Instrumented code */
+    r= pthread_mutex_trylock(&mutex->pmutex);
+
+    /* Instrumentation end */
+    if (locker != NULL)
+      PSI_MUTEX_CALL(end_mutex_wait)(locker, r);
+
+  }
+  else
+    r= pthread_mutex_trylock(&mutex->pmutex);
+#else
+    r= pthread_mutex_trylock(&mutex->pmutex);
+#endif
+
+#if TOKU_PTHREAD_DEBUG
+    if (r == 0) {  
+        invariant(mutex->valid);
+        invariant(!mutex->locked);
+        invariant(mutex->owner == 0);
+        mutex->locked = true;
+        mutex->owner = pthread_self();
+    }
+#endif
+    return r;
+}
+ 
+static inline void inline_toku_mutex_init(
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+  PSI_mutex_key key,
+#endif
+  toku_mutex_t *mutex,
+  const toku_pthread_mutexattr_t *attr
+  )
+{
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+    mutex->psi_mutex= PSI_MUTEX_CALL(init_mutex)(key, &mutex->pmutex);
+#endif
+    int r = pthread_mutex_init(&mutex->pmutex, attr);
+    assert_zero(r);   
+#if TOKU_PTHREAD_DEBUG
+    mutex->locked = false;   
+    invariant(!mutex->valid);
+    mutex->valid = true;
+    mutex->owner = 0;
+#endif
+}
+
+
+#ifdef HAVE_PSI_COND_INTERFACE
+  #define toku_cond_init(K, C, A) inline_toku_cond_init(K, C, A)
+#else
+  #define toku_cond_init(K, C, A) inline_toku_cond_init(C, A)
+#endif
+
+#ifdef HAVE_PSI_COND_INTERFACE
+  #define toku_cond_wait(C, M) \
+    inline_toku_cond_wait(C, M, __FILE__, __LINE__)
+#else
+  #define toku_cond_wait(C, M) \
+    inline_toku_cond_wait(C, M) 
+#endif
+            
+#ifdef HAVE_PSI_COND_INTERFACE
+  #define toku_cond_timedwait(C, M, W) \
+    inline_toku_cond_timedwait(C, M, W, __FILE__, __LINE__)
+#else
+  #define toku_cond_timedwait(C, M, W) \
+    inline_toku_cond_timedwait(C, M, W) 
+#endif
+
+#define toku_cond_signal(C) inline_toku_cond_signal(C)
+#define toku_cond_broadcast(C) inline_toku_cond_broadcast(C)
+#define toku_cond_destroy(C) inline_toku_cond_destroy(C)
+
+
+static inline void
+nonpfs_toku_cond_init(toku_cond_t *cond, const toku_pthread_condattr_t *attr) {
+    int r = pthread_cond_init(&cond->pcond, attr);
+    assert_zero(r);
+}
+
+static inline void
+nonpfs_toku_cond_destroy(toku_cond_t *cond) {
+    int r = pthread_cond_destroy(&cond->pcond);
+    assert_zero(r);
+}
+
+static inline void
+nonpfs_toku_cond_wait(toku_cond_t *cond, toku_mutex_t *mutex) {
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->locked);
+    mutex->locked = false;
+    mutex->owner = 0;
+#endif
+    int r = pthread_cond_wait(&cond->pcond, &mutex->pmutex);
+    assert_zero(r);
+#if TOKU_PTHREAD_DEBUG
+    invariant(!mutex->locked);
+    mutex->locked = true;
+    mutex->owner = pthread_self();
+#endif
+}
+
+static inline int 
+nonpfs_toku_cond_timedwait(toku_cond_t *cond, toku_mutex_t *mutex, toku_timespec_t *wakeup_at) {
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->locked);
+    mutex->locked = false;
+    mutex->owner = 0;
+#endif
+    int r = pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
+#if TOKU_PTHREAD_DEBUG
+    invariant(!mutex->locked);
+    mutex->locked = true;
+    mutex->owner = pthread_self();
+#endif
+    return r;
+}
+
+static inline void 
+nonpfs_toku_cond_signal(toku_cond_t *cond) {
+    int r = pthread_cond_signal(&cond->pcond);
+    assert_zero(r);
+}
+
+static inline void
+nonpfs_toku_cond_broadcast(toku_cond_t *cond) {
+    int r =pthread_cond_broadcast(&cond->pcond);
+    assert_zero(r);
+}
+
+
+
+static inline void inline_toku_cond_init(
+#ifdef HAVE_PSI_COND_INTERFACE
+  PSI_cond_key key,
+#endif
+  toku_cond_t *cond,
+  const pthread_condattr_t *attr)
+{
+#ifdef HAVE_PSI_COND_INTERFACE
+  cond->psi_cond= PSI_COND_CALL(init_cond)(key, &cond->psi_cond);
+#endif
+  int r = pthread_cond_init(&cond->pcond, attr);
+  assert_zero(r);
+}
+
+
+static inline void inline_toku_cond_destroy(
+  toku_cond_t *cond)
+{
+#ifdef HAVE_PSI_COND_INTERFACE
+  if (cond->psi_cond != NULL)
+  {
+    PSI_COND_CALL(destroy_cond)(cond->psi_cond);
+    cond->psi_cond= NULL;
+  }
+#endif
+  int r = pthread_cond_destroy(&cond->pcond);
+  assert_zero(r);
+}
+
+static inline void inline_toku_cond_wait(
+  toku_cond_t *cond,
+  toku_mutex_t *mutex
+#ifdef HAVE_PSI_COND_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+  )   
+{     
+  int r=0;
+
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->locked);
+    mutex->locked = false;   
+    mutex->owner = 0;
+#endif
+
+#ifdef HAVE_PSI_COND_INTERFACE
+  if (cond->psi_cond != NULL)
+  {
+    /* Instrumentation start */
+    PSI_cond_locker *locker;   
+    PSI_cond_locker_state state;
+    locker= PSI_COND_CALL(start_cond_wait)(&state, cond->psi_cond, mutex->psi_mutex,
+                                           PSI_COND_WAIT, src_file, src_line);
+
+    /* Instrumented code */
+    r= pthread_cond_wait(&cond->pcond, &mutex->pmutex);
+
+    /* Instrumentation end */
+    if (locker != NULL)
+      PSI_COND_CALL(end_cond_wait)(locker, r);
+  }
+#else
+  /* Non instrumented code */
+  r= pthread_cond_wait(&cond->pcond, &mutex->pmutex);
+#endif
+  assert_zero(r);
+#if TOKU_PTHREAD_DEBUG
+  invariant(!mutex->locked);
+  mutex->locked = true;
+  mutex->owner = pthread_self();
+#endif
+
+}
+
+static inline int inline_toku_cond_timedwait(
+  toku_cond_t *cond,
+  toku_mutex_t *mutex,
+  toku_timespec_t *wakeup_at
+#ifdef HAVE_PSI_COND_INTERFACE  
+  , const char *src_file, uint src_line
+#endif
+  )   
+{     
+  int r=0;
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->locked);
+    mutex->locked = false;   
+    mutex->owner = 0;
+#endif
+
+#ifdef HAVE_PSI_COND_INTERFACE
+  if (cond->psi_cond != NULL)
+  {
+    /* Instrumentation start */
+    PSI_cond_locker *locker;   
+    PSI_cond_locker_state state;
+    locker= PSI_COND_CALL(start_cond_wait)(&state, cond->psi_cond, mutex->psi_mutex,
+                                           PSI_COND_TIMEDWAIT, src_file, src_line);
+
+    /* Instrumented code */
+    r= pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
+
+    /* Instrumentation end */
+    if (locker != NULL)
+      PSI_COND_CALL(end_cond_wait)(locker, r);
+  }
+#else
+  /* Non instrumented code */
+  r= pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
+#endif
+#if TOKU_PTHREAD_DEBUG
+    invariant(!mutex->locked);
+    mutex->locked = true;
+    mutex->owner = pthread_self();
+#endif
+    return r;
+
+}
+
+static inline void inline_toku_cond_signal(
+  toku_cond_t *cond)
+{
+  int r;
+#ifdef HAVE_PSI_COND_INTERFACE
+  if (cond->psi_cond != NULL)
+    PSI_COND_CALL(signal_cond)(cond->psi_cond);
+#endif
+  r= pthread_cond_signal(&cond->pcond);
+  assert_zero(r);
+}
+ 
+static inline void inline_toku_cond_broadcast(
+  toku_cond_t *cond)
+{
+  int r;
+#ifdef HAVE_PSI_COND_INTERFACE
+  if (cond->psi_cond != NULL)
+    PSI_COND_CALL(broadcast_cond)(cond->psi_cond);
+#endif
+  r= pthread_cond_broadcast(&cond->pcond);
+  assert_zero(r);
+}
+
+
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  #define toku_pthread_rwlock_init(K, RW, A) inline_toku_pthread_rwlock_init(K, RW, A)
+#else
+  #define toku_pthread_rwlock_init(K, RW, A) inline_toku_pthread_rwlock_init(RW, A)
+#endif
+
+#define toku_pthread_rwlock_destroy(RW) inline_toku_pthread_rwlock_destroy(RW)
+
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  #define toku_pthread_rwlock_rdlock(RW) \
+    inline_toku_pthread_rwlock_rdlock(RW, __FILE__, __LINE__)
+#else
+  #define toku_pthread_rwlock_rdlock(RW) \
+    inline_toku_pthread_rwlock_rdlock(RW) 
+#endif
+
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  #define toku_pthread_rwlock_wrlock(RW) \
+    inline_toku_pthread_rwlock_wrlock(RW, __FILE__, __LINE__)
+#else
+  #define toku_pthread_rwlock_wrlock(RW) \
+    inline_toku_pthread_rwlock_wrlock(RW) 
+#endif
+
+#define toku_pthread_rwlock_rdunlock(RW) inline_toku_pthread_rwlock_rdunlock(RW)
+#define toku_pthread_rwlock_wrunlock(RW) inline_toku_pthread_rwlock_wrunlock(RW)
+
+
+
+static inline void inline_toku_pthread_rwlock_init(
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  PSI_rwlock_key key,
+#endif
+  toku_pthread_rwlock_t *__restrict rwlock,
+  const toku_pthread_rwlockattr_t *__restrict attr)
+{
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  rwlock->psi_rwlock= PSI_RWLOCK_CALL(init_rwlock)(key, &rwlock->rwlock);
+#endif
+  int r = pthread_rwlock_init(&rwlock->rwlock, attr);
+  assert_zero(r);
+}
+
+static inline void inline_toku_pthread_rwlock_destroy(
+  toku_pthread_rwlock_t *rwlock)
+{
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  if (rwlock->psi_rwlock != NULL)
+  {
+    PSI_RWLOCK_CALL(destroy_rwlock)(rwlock->psi_rwlock);
+    rwlock->psi_rwlock= NULL;
+  }
+#endif
+  int r = pthread_rwlock_destroy(&rwlock->rwlock);
+  assert_zero(r);
+}
+
+static inline void inline_toku_pthread_rwlock_rdlock(
+  toku_pthread_rwlock_t *rwlock
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+  )   
+{     
+  int r=0;
+
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  if (rwlock->psi_rwlock != NULL)
+  {
+    /* Instrumentation start */
+    PSI_rwlock_locker *locker; 
+    PSI_rwlock_locker_state state;
+    locker= PSI_RWLOCK_CALL(start_rwlock_rdwait)(&state, rwlock->psi_rwlock,
+                                                 PSI_RWLOCK_READLOCK, src_file, src_line);
+
+    /* Instrumented code */
+    r= pthread_rwlock_rdlock(&rwlock->rwlock);
+
+    /* Instrumentation end */
+    if (locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_rdwait)(locker, r);
+  }
+#else
+  /* Non instrumented code */
+  r= pthread_rwlock_rdlock(&rwlock->rwlock);
+#endif
+
+  assert_zero(r);
+}
+
+static inline void inline_toku_pthread_rwlock_wrlock(
+  toku_pthread_rwlock_t *rwlock
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+  )   
+{     
+  int r=0;
+
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  if (rwlock->psi_rwlock != NULL)
+  {
+    /* Instrumentation start */
+    PSI_rwlock_locker *locker; 
+    PSI_rwlock_locker_state state;
+    locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, rwlock->psi_rwlock,
+                                              PSI_RWLOCK_WRITELOCK, src_file, src_line);
+
+    /* Instrumented code */
+    r= pthread_rwlock_wrlock(&rwlock->rwlock);
+
+    /* Instrumentation end */
+    if (locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, r);
+  }
+#else
+  /* Non instrumented code */
+  r= pthread_rwlock_wrlock(&rwlock->rwlock);
+#endif
+  assert_zero(r);
+}
+
+static inline void inline_toku_pthread_rwlock_rdunlock(
+  toku_pthread_rwlock_t *rwlock)
+{
+  int r;
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  if (rwlock->psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->psi_rwlock);
+#endif
+  r= pthread_rwlock_unlock(&rwlock->rwlock);
+  assert_zero(r);
+}
+
+static inline void inline_toku_pthread_rwlock_wrunlock(
+  toku_pthread_rwlock_t *rwlock)
+{
+  int r;
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+  if (rwlock->psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->psi_rwlock);
+#endif
+  r= pthread_rwlock_unlock(&rwlock->rwlock);
+  assert_zero(r);
+}
+
+#endif /* TOKU_PTHREAD_OLD  */
+
+
 static inline int 
 toku_pthread_create(toku_pthread_t *thread, const toku_pthread_attr_t *attr, void *(*start_function)(void *), void *arg) {
     return pthread_create(thread, attr, start_function, arg);
@@ -649,4 +1006,12 @@ toku_pthread_getspecific(toku_pthread_key_t key) {
 static inline int 
 toku_pthread_setspecific(toku_pthread_key_t key, void *data) {
     return pthread_setspecific(key, data);
+}
+
+int 
+toku_pthread_yield(void) __attribute__((__visibility__("default")));
+
+static inline toku_pthread_t 
+toku_pthread_self(void) {
+    return pthread_self();
 }
