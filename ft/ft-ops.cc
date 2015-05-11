@@ -240,7 +240,157 @@ static FT_STATUS_S ft_status;
 #define STATUS_INIT(k,c,t,l,inc) TOKUFT_STATUS_INIT(ft_status, k, c, t, "ft: " l, inc)
 
 static toku_mutex_t ft_open_close_lock;
+
+//ft-index mutexes
 pfs_key_t ft_open_close_lock_mutex_key;
+extern pfs_key_t txn_manager_lock_mutex_key;
+extern pfs_key_t kibbutz_mutex_key;
+extern pfs_key_t ft_ref_lock_mutex_key;
+extern pfs_key_t txn_lock_mutex_key;
+extern pfs_key_t txn_state_lock_mutex_key;
+extern pfs_key_t rollback_log_node_cache_mutex_key;
+extern pfs_key_t txn_child_manager_mutex_key;
+extern pfs_key_t block_allocator_trace_lock_mutex_key;
+extern pfs_key_t block_table_mutex_key;
+extern pfs_key_t bjm_jobs_lock_mutex_key;  
+extern pfs_key_t checkpoint_safe_mutex_key;
+extern pfs_key_t bfs_mutex_key;
+extern pfs_key_t loader_error_mutex_key;
+extern pfs_key_t loader_bl_mutex_key;
+extern pfs_key_t loader_fi_lock_mutex_key;
+extern pfs_key_t loader_out_mutex_key;
+extern pfs_key_t result_output_condition_lock_mutex_key;
+extern pfs_key_t manager_mutex_key;
+extern pfs_key_t manager_escalation_mutex_key;
+extern pfs_key_t manger_escalator_mutex_key;
+extern pfs_key_t locktree_request_info_mutex_key; 
+extern pfs_key_t indexer_i_indexer_lock_mutex_key;
+extern pfs_key_t indexer_i_indexer_estimate_lock_mutex_key;
+extern pfs_key_t db_txn_struct_i_txn_mutex_key;
+extern pfs_key_t minicron_p_mutex_key;  
+extern pfs_key_t queue_result_mutex_key;
+extern pfs_key_t tpool_lock_mutex_key;  
+extern pfs_key_t cachetable_m_mutex_key;
+extern pfs_key_t cachetable_ev_thread_lock_mutex_key;
+extern pfs_key_t log_internal_lock_mutex_key;
+extern pfs_key_t workset_lock_mutex_key;
+
+//condition vars
+extern pfs_key_t result_state_cond_key;
+extern pfs_key_t bjm_jobs_wait_key;    
+extern pfs_key_t cachetable_p_refcount_wait_key;
+extern pfs_key_t cachetable_m_flow_control_cond_key;
+extern pfs_key_t cachetable_m_ev_thread_cond_key;   
+extern pfs_key_t bfs_cond_key;
+extern pfs_key_t result_output_condition_key;
+extern pfs_key_t manager_m_escalator_done_key;
+extern pfs_key_t lock_request_m_wait_cond_key;
+extern pfs_key_t queue_result_cond_key;
+extern pfs_key_t ws_worker_wait_key;
+extern pfs_key_t rwlock_wait_read_key;  
+extern pfs_key_t rwlock_wait_write_key; 
+extern pfs_key_t rwlock_cond_key;
+extern pfs_key_t tp_thread_wait_key;
+extern pfs_key_t tp_pool_wait_free_key;
+extern pfs_key_t frwlock_m_wait_read_key;
+extern pfs_key_t kibbutz_k_cond_key;
+
+//rwlocks
+extern pfs_key_t multi_operation_lock_key;
+extern pfs_key_t low_priority_multi_operation_lock_key;
+extern pfs_key_t cachetable_m_list_lock_key;   
+extern pfs_key_t cachetable_m_pending_lock_expensive_key;
+extern pfs_key_t cachetable_m_pending_lock_cheap_key;
+extern pfs_key_t cachetable_m_lock_key;
+extern pfs_key_t result_i_open_dbs_rwlock_key;
+//extern pfs_key_t checkpoint_safe_rwlock_key;
+//extern pfs_key_t cachetable_value_key;
+
+//extern pfs_key_t treenode_mutex_key;
+//extern pfs_key_t fmutex_cond_key;   
+//extern pfs_key_t circular_buffer_m_lock_mutex_key;
+//extern pfs_key_t circular_buffer_m_push_cond_key; 
+//extern pfs_key_t circular_buffer_m_pop_cond_key;  
+
+static PSI_mutex_info   all_ftindex_mutexes[] = {
+        {&txn_manager_lock_mutex_key, "txn_manager_lock_mutex", 0},
+        {&kibbutz_mutex_key, "kibbutz_mutex", 0},
+        {&ft_ref_lock_mutex_key, "ft_ref_lock_mutex", 0},
+        {&txn_lock_mutex_key, "txn_lock_mutex", 0},
+        {&txn_state_lock_mutex_key, "txn_state_lock_mutex", 0},
+        {&rollback_log_node_cache_mutex_key, "rollback_log_node_cache_mutex", 0},
+        {&txn_child_manager_mutex_key, "txn_child_manager_mutex", 0},
+        {&block_allocator_trace_lock_mutex_key, "block_allocator_trace_lock_mutex", 0},
+        {&block_table_mutex_key, "block_table_mutex", 0},
+        {&workset_lock_mutex_key, "workset_lock_mutex", 0},
+        {&log_internal_lock_mutex_key, "log_internal_lock_mutex", 0},
+#if 0
+        {&circular_buffer_m_lock_mutex_key, "circular_buffer_m_lock_mutex", 0},
+        {&treenode_mutex_key, "treenode_mutex", 0},
+#endif
+        {&ft_open_close_lock_mutex_key, "ft_open_close_lock_mutex", 0},
+        {&bjm_jobs_lock_mutex_key, "bjm_jobs_lock_mutex", 0},
+        {&checkpoint_safe_mutex_key, "checkpoint_safe_mutex", 0},
+        {&bfs_mutex_key, "bfs_mutex", 0},
+        {&loader_error_mutex_key, "loader_error_mutex", 0},
+        {&loader_bl_mutex_key, "loader_bl_mutex", 0},
+        {&loader_fi_lock_mutex_key, "loader_fi_lock_mutex", 0},
+        {&loader_out_mutex_key, "loader_out_mutex", 0},
+        {&result_output_condition_lock_mutex_key,"result_output_condition_lock_mutex", 0},
+        {&manager_mutex_key, "manager_mutex", 0},
+        {&manager_escalation_mutex_key, "manager_escalation_mutex", 0},
+        {&manger_escalator_mutex_key, "manager_escalator_mutex", 0},   
+        {&locktree_request_info_mutex_key, "locktree_request_info_mutex", 0},
+        {&indexer_i_indexer_lock_mutex_key, "indexer_i_indexer_lock_mutex", 0},
+        {&indexer_i_indexer_estimate_lock_mutex_key,   "indexer_i_indexer_estimate_lock_mutex", 0},
+        {&db_txn_struct_i_txn_mutex_key, "db_txn_struct_i_txn_mutex", 0},
+        {&minicron_p_mutex_key, "minicron_p_mutex", 0},
+        {&queue_result_mutex_key, "queue_result_mutex", 0},
+        {&tpool_lock_mutex_key, "tpool_lock__mutex", 0},   
+        {&cachetable_m_mutex_key, "cachetable_m_mutex", 0},
+        {&cachetable_ev_thread_lock_mutex_key, "cachetable_ev_thread_lock_mutex", 0},
+};
+
+static PSI_cond_info all_ftindex_conds[] = {
+            {&result_state_cond_key,"result_state_cond",0},
+            {&ws_worker_wait_key,"ws_worker_wait",0},
+            {&bjm_jobs_wait_key,"bjm_jobs_wait",0},  
+            {&cachetable_p_refcount_wait_key,"cachetable_p_refcount_wait",0},
+            {&cachetable_m_flow_control_cond_key,"cachetable_m_flow_control_cond",0},
+            {&cachetable_m_ev_thread_cond_key,"cachetable_m_ev_thread_cond",0},
+            {&bfs_cond_key,"bfs_cond",0},
+            {&result_output_condition_key,"result_output_condition",0},
+            {&manager_m_escalator_done_key,"manager_m_escalator_done",0},
+            {&lock_request_m_wait_cond_key,"lock_request_m_wait_cond",0},
+#if 0
+            {&circular_buffer_m_push_cond_key,"circular_buffer_m_push_cond",0},
+            {&circular_buffer_m_pop_cond_key,"circular_buffer_m_pop_cond",0},  
+            {&fmutex_cond_key,"fmutex_cond",0},
+#endif
+            {&queue_result_cond_key,"queue_result_cond",0},
+            {&rwlock_wait_read_key,"rwlock_wait_read",0},  
+            {&rwlock_wait_write_key,"rwlock_wait_write",0},
+            {&rwlock_cond_key,"rwlock_cond",0},
+            {&tp_thread_wait_key,"tp_thread_wait",0},
+            {&tp_pool_wait_free_key,"tp_pool_wait_free",0},
+            {&frwlock_m_wait_read_key,"frwlock_m_wait_read",0},
+            {&kibbutz_k_cond_key,"kibbutz_k_cond",0}
+};
+  
+static PSI_rwlock_info all_ftindex_rwlocks[] = {
+            {&multi_operation_lock_key,"multi_operation_lock",0},
+            {&low_priority_multi_operation_lock_key,"low_priority_multi_operation_lock",0},
+#if 0
+            {&checkpoint_safe_rwlock_key,"checkpoint_safe_rwlock",0},
+            {&cachetable_value_key,"cachetable_value",0},                           
+#endif
+            {&cachetable_m_list_lock_key,"cachetable_m_list_lock",0},   
+            {&cachetable_m_pending_lock_expensive_key,"cachetable_m_pending_lock_expensive",0},
+            {&cachetable_m_pending_lock_cheap_key,"cachetable_m_pending_lock_cheap",0},
+            {&cachetable_m_lock_key,"cachetable_m_lock",0},
+            {&result_i_open_dbs_rwlock_key,"result_i_open_dbs_rwlock",0}
+};
+
 
 static void
 status_init(void)
@@ -4530,9 +4680,22 @@ int toku_dump_ft(FILE *f, FT_HANDLE ft_handle) {
 
 int toku_ft_layer_init(void) {
     int r = 0;
+    int count;
     //Portability must be initialized first
     r = toku_portability_init();
     if (r) { goto exit; }
+
+#ifdef HAVE_PSI_INTERFACE
+    count = array_elements(all_ftindex_mutexes);
+    mysql_mutex_register("fti", all_ftindex_mutexes, count);
+    
+    count = array_elements(all_ftindex_rwlocks);
+    mysql_rwlock_register("fti", all_ftindex_rwlocks, count);
+  
+    count = array_elements(all_ftindex_conds);
+    mysql_cond_register("fti", all_ftindex_conds, count);
+#endif        
+
     r = db_env_set_toku_product_name("tokudb");
     if (r) { goto exit; }
 
@@ -4558,6 +4721,7 @@ void toku_ft_layer_destroy(void) {
     toku_context_status_destroy();
     partitioned_counters_destroy();
     toku_scoped_malloc_destroy();
+
     //Portability must be cleaned up last
     toku_portability_destroy();
 }

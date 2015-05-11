@@ -113,9 +113,8 @@ typedef pthread_key_t toku_pthread_key_t;
 typedef struct timespec toku_timespec_t;
 typedef unsigned int    pfs_key_t;
 
-
-#undef HAVE_PSI_RWLOCK_INTERFACE
-#undef HAVE_PSI_COND_INTERFACE
+//#undef HAVE_PSI_RWLOCK_INTERFACE
+//#undef HAVE_PSI_COND_INTERFACE
 //#undef HAVE_PSI_MUTEX_INTERFACE
 
 #ifndef TOKU_PTHREAD_DEBUG
@@ -156,13 +155,6 @@ typedef struct toku_rwlock {
 
 typedef toku_pfs_rwlock_t toku_pthread_rwlock_t;
 
-/* Mutexes for PFS probes */
-extern toku_mutex_t probe_mutex_1;
-extern toku_mutex_t probe_mutex_2;
-extern toku_mutex_t probe_mutex_3;
-extern toku_mutex_t probe_mutex_4;
-
-
 // Different OSes implement mutexes as different amounts of nested structs.
 // C++ will fill out all missing values with zeroes if you provide at least one zero, but it needs the right amount of nesting.
 #if defined(__FreeBSD__)
@@ -175,50 +167,26 @@ extern toku_mutex_t probe_mutex_4;
 
 
 #if TOKU_PTHREAD_DEBUG
-# ifdef HAVE_PSI_MUTEX_INTERFACE
-#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true, .psi_mutex = 0 }
-# else
 #  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true }
-# endif
 #else
-# ifdef HAVE_PSI_MUTEX_INTERFACE 
-#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .psi_mutex = 0 }
-# else
 #  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER }
-# endif
 #endif
 
 // Darwin doesn't provide adaptive mutexes
 #if defined(__APPLE__)
 # define TOKU_MUTEX_ADAPTIVE PTHREAD_MUTEX_DEFAULT
-# ifdef HAVE_PSI_MUTEX_INTERFACE
-#  if TOKU_PTHREAD_DEBUG
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true, .psi_mutex = 0 }
-#  else
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .psi_mutex = 0 }
-#  endif
-# else
 #  if TOKU_PTHREAD_DEBUG
 #   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true }
 #  else
 #   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER }
 #  endif
-# endif
 #else // __FreeBSD__, __linux__, at least
 # define TOKU_MUTEX_ADAPTIVE PTHREAD_MUTEX_ADAPTIVE_NP
-# ifdef HAVE_PSI_MUTEX_INTERFACE
-#  if TOKU_PTHREAD_DEBUG
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .owner = 0, .locked = false, .valid = true, .psi_mutex = 0 }
-#  else
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .psi_mutex = 0 }
-#  endif
-# else
 #  if TOKU_PTHREAD_DEBUG
 #   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .owner = 0, .locked = false, .valid = true}
 #  else
 #   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP }
 #  endif
-# endif
 #endif
 
 // Different OSes implement mutexes as different amounts of nested structs.
@@ -232,7 +200,7 @@ extern toku_mutex_t probe_mutex_4;
 #endif
 
 #ifdef HAVE_PSI_COND_INTERFACE
-  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond = 0 }
+  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER }
 #else
   #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER }
 #endif
@@ -434,19 +402,6 @@ toku_pthread_rwlock_wrunlock(toku_pthread_rwlock_t *rwlock) {
 #define toku_mutex_unlock(M) \
     inline_toku_mutex_unlock(M) 
 
-
-#define probe_start(probe_mutex) \
-        /* Instrumentation start */ \
-        PSI_mutex_locker *locker; \
-        PSI_mutex_locker_state state; \
-        locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, (probe_mutex)->psi_mutex, PSI_MUTEX_LOCK, __FILE__, __LINE__);
-
-#define probe_stop() \
-        /* Instrumentation end */ \
-        if (locker != NULL) \
-           PSI_MUTEX_CALL(end_mutex_wait)(locker, 0);
-
- 
 static inline void inline_toku_mutex_unlock(toku_mutex_t *mutex)   
 {     
 
@@ -604,6 +559,8 @@ static inline void inline_toku_mutex_init(
   #define toku_cond_init(K, C, A) inline_toku_cond_init(C, A)
 #endif
 
+#define nonpfs_toku_cond_init(K, C, A) inline_nonpfs_toku_cond_init(C, A)
+
 #ifdef HAVE_PSI_COND_INTERFACE
   #define toku_cond_wait(C, M) \
     inline_toku_cond_wait(C, M, __FILE__, __LINE__)
@@ -626,7 +583,7 @@ static inline void inline_toku_mutex_init(
 
 
 static inline void
-nonpfs_toku_cond_init(toku_cond_t *cond, const toku_pthread_condattr_t *attr) {
+inline_nonpfs_toku_cond_init(toku_cond_t *cond, const toku_pthread_condattr_t *attr) {
     int r = pthread_cond_init(&cond->pcond, attr);
     assert_zero(r);
 }

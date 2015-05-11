@@ -136,14 +136,7 @@ void locktree_manager::mutex_lock(void) {
 }
 
 void locktree_manager::mutex_unlock(void) {
-
-    //Instrumentation probe start
-//    probe_start(&probe_mutex_1);
-
     toku_mutex_unlock(&m_mutex);
-
-    //Instrumentation probe stop
-//    probe_stop();
 }
 
 size_t locktree_manager::get_max_lock_memory(void) {

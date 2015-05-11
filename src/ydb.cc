@@ -153,15 +153,6 @@ env_panic(DB_ENV * env, int cause, const char * msg) {
 }
 
 pfs_key_t result_i_open_dbs_rwlock_key;
-pfs_key_t probe_mutex_1_key;
-pfs_key_t probe_mutex_2_key;
-pfs_key_t probe_mutex_3_key;
-pfs_key_t probe_mutex_4_key;
-
-toku_mutex_t  probe_mutex_1; 
-toku_mutex_t  probe_mutex_2; 
-toku_mutex_t  probe_mutex_3; 
-toku_mutex_t  probe_mutex_4; 
 
 static int env_get_engine_status_num_rows (DB_ENV * UU(env), uint64_t * num_rowsp);
 
@@ -888,7 +879,7 @@ env_open(DB_ENV * env, const char *home, uint32_t flags, int mode) {
     env_setup_real_data_dir(env);
     env_setup_real_log_dir(env);
     env_setup_real_tmp_dir(env);
-
+    
     r = toku_single_process_lock(env->i->dir, "environment", &env->i->envdir_lockfd);
     if (r!=0) goto cleanup;
     r = toku_single_process_lock(env->i->real_data_dir, "data", &env->i->datadir_lockfd);
@@ -1216,13 +1207,6 @@ env_close(DB_ENV * env, uint32_t flags) {
     if (env->i->dir)
         toku_free(env->i->dir);
     toku_pthread_rwlock_destroy(&env->i->open_dbs_rwlock);
-
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-//    toku_mutex_destroy(&probe_mutex_4);
-//    toku_mutex_destroy(&probe_mutex_3);    
-//    toku_mutex_destroy(&probe_mutex_2);
-//    toku_mutex_destroy(&probe_mutex_1);
-#endif        
 
     // Immediately before freeing internal environment unlock the directories
     unlock_single_process(env);
@@ -2585,14 +2569,6 @@ toku_env_create(DB_ENV ** envp, uint32_t flags) {
     MALLOC(result);
     if (result == 0) { r = ENOMEM; goto cleanup; }
     memset(result, 0, sizeof *result);
-
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-//    toku_mutex_init(probe_mutex_1_key, &probe_mutex_1, NULL);
-//    toku_mutex_init(probe_mutex_2_key, &probe_mutex_2, NULL);    
-//    toku_mutex_init(probe_mutex_3_key, &probe_mutex_3, NULL);
-//    toku_mutex_init(probe_mutex_4_key, &probe_mutex_4, NULL);
-#endif        
-
 
     // locked methods
     result->err = (void (*)(const DB_ENV * env, int error, const char *fmt, ...)) toku_env_err;

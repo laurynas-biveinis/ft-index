@@ -228,9 +228,9 @@ static __attribute__((__unused__))
 void
 rwlock_init(RWLOCK rwlock) {
     rwlock->reader = rwlock->want_read = 0;
-    toku_cond_init(rwlock_wait_read_key, &rwlock->wait_read, 0);
+    nonpfs_toku_cond_init(rwlock_wait_read_key, &rwlock->wait_read, 0);
     rwlock->writer = rwlock->want_write = 0;
-    toku_cond_init(rwlock_wait_write_key, &rwlock->wait_write, 0);
+    nonpfs_toku_cond_init(rwlock_wait_write_key, &rwlock->wait_write, 0);
     rwlock->wait_users_go_to_zero = NULL;
 }
 
@@ -243,8 +243,8 @@ rwlock_destroy(RWLOCK rwlock) {
     paranoid_invariant(rwlock->want_read == 0);
     paranoid_invariant(rwlock->writer == 0);
     paranoid_invariant(rwlock->want_write == 0);
-    toku_cond_destroy(&rwlock->wait_read);
-    toku_cond_destroy(&rwlock->wait_write);
+    nonpfs_toku_cond_destroy(&rwlock->wait_read);
+    nonpfs_toku_cond_destroy(&rwlock->wait_write);
 }
 
 // obtain a read lock
@@ -255,7 +255,7 @@ static inline void rwlock_read_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
     if (rwlock->writer || rwlock->want_write) {
         rwlock->want_read++;
         while (rwlock->writer || rwlock->want_write) {
-            toku_cond_wait(&rwlock->wait_read, mutex);
+            nonpfs_toku_cond_wait(&rwlock->wait_read, mutex);
         }
         rwlock->want_read--;
     }
@@ -270,10 +270,10 @@ static inline void rwlock_read_unlock(RWLOCK rwlock) {
     paranoid_invariant(rwlock->writer == 0);
     rwlock->reader--;
     if (rwlock->reader == 0 && rwlock->want_write) {
-        toku_cond_signal(&rwlock->wait_write);
+        nonpfs_toku_cond_signal(&rwlock->wait_write);
     }
     if (rwlock->wait_users_go_to_zero && rwlock_users(rwlock) == 0) {
-        toku_cond_signal(rwlock->wait_users_go_to_zero);
+        nonpfs_toku_cond_signal(rwlock->wait_users_go_to_zero);
     }
 }
 
@@ -285,7 +285,7 @@ static inline void rwlock_write_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
     if (rwlock->reader || rwlock->writer) {
         rwlock->want_write++;
         while (rwlock->reader || rwlock->writer) {
-            toku_cond_wait(&rwlock->wait_write, mutex);
+            nonpfs_toku_cond_wait(&rwlock->wait_write, mutex);
         }
         rwlock->want_write--;
     }
@@ -300,12 +300,12 @@ static inline void rwlock_write_unlock(RWLOCK rwlock) {
     paranoid_invariant(rwlock->writer == 1);
     rwlock->writer--;
     if (rwlock->want_write) {
-        toku_cond_signal(&rwlock->wait_write);
+        nonpfs_toku_cond_signal(&rwlock->wait_write);
     } else if (rwlock->want_read) {
-        toku_cond_broadcast(&rwlock->wait_read);
+        nonpfs_toku_cond_broadcast(&rwlock->wait_read);
     }    
     if (rwlock->wait_users_go_to_zero && rwlock_users(rwlock) == 0) {
-        toku_cond_signal(rwlock->wait_users_go_to_zero);
+        nonpfs_toku_cond_signal(rwlock->wait_users_go_to_zero);
     }
 }
 
@@ -348,12 +348,12 @@ static inline void rwlock_wait_for_users(
 {
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     toku_cond_t cond;
-    toku_cond_init(rwlock_cond_key,&cond, NULL);
+    nonpfs_toku_cond_init(rwlock_cond_key,&cond, NULL);
     while (rwlock_users(rwlock) > 0) {
         rwlock->wait_users_go_to_zero = &cond;
-        toku_cond_wait(&cond, mutex);
+        nonpfs_toku_cond_wait(&cond, mutex);
     }
     rwlock->wait_users_go_to_zero = NULL;
-    toku_cond_destroy(&cond);
+    nonpfs_toku_cond_destroy(&cond);
 }
 

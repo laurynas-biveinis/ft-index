@@ -207,7 +207,7 @@ toku_minicron_setup(struct minicron *p, uint32_t period_in_ms, int(*f)(void *), 
     p->do_shutdown = false;
     toku_mutex_init(minicron_p_mutex_key, &p->mutex, 0);
 #if MINCRON_PFS_STUCK
-     nonpfs_toku_cond_init( &p->condvar, 0);
+     nonpfs_toku_cond_init(minicron_p_condvar_key, &p->condvar, 0);
 #else 
      toku_cond_init(minicron_p_condvar_key, &p->condvar, 0);
 #endif
