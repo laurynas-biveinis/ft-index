@@ -241,6 +241,17 @@ static FT_STATUS_S ft_status;
 
 static toku_mutex_t ft_open_close_lock;
 
+//probe mutexes
+toku_mutex_t  fti_probe_mutex_1; 
+toku_mutex_t  fti_probe_mutex_2; 
+toku_mutex_t  fti_probe_mutex_3;
+toku_mutex_t  fti_probe_mutex_4;
+
+pfs_key_t fti_probe_mutex_1_key;
+pfs_key_t fti_probe_mutex_2_key;
+pfs_key_t fti_probe_mutex_3_key;
+pfs_key_t fti_probe_mutex_4_key;
+
 //ft-index mutexes
 pfs_key_t ft_open_close_lock_mutex_key;
 extern pfs_key_t txn_manager_lock_mutex_key;
@@ -311,6 +322,14 @@ extern pfs_key_t result_i_open_dbs_rwlock_key;
 //extern pfs_key_t circular_buffer_m_lock_mutex_key;
 //extern pfs_key_t circular_buffer_m_push_cond_key; 
 //extern pfs_key_t circular_buffer_m_pop_cond_key;  
+
+
+static PSI_mutex_info   all_ftindex_probe_mutexes[] = {
+        {&fti_probe_mutex_1_key,"fti_probe_mutex_1",0},
+        {&fti_probe_mutex_2_key,"fti_probe_mutex_2",0},        
+        {&fti_probe_mutex_3_key,"fti_probe_mutex_3",0},
+        {&fti_probe_mutex_4_key,"fti_probe_mutex_4",0},
+};
 
 static PSI_mutex_info   all_ftindex_mutexes[] = {
         {&txn_manager_lock_mutex_key, "txn_manager_lock_mutex", 0},
@@ -4686,6 +4705,9 @@ int toku_ft_layer_init(void) {
     if (r) { goto exit; }
 
 #ifdef HAVE_PSI_INTERFACE
+    count = array_elements(all_ftindex_probe_mutexes);
+    mysql_mutex_register("fti", all_ftindex_probe_mutexes, count);
+
     count = array_elements(all_ftindex_mutexes);
     mysql_mutex_register("fti", all_ftindex_mutexes, count);
     
@@ -4694,6 +4716,11 @@ int toku_ft_layer_init(void) {
   
     count = array_elements(all_ftindex_conds);
     mysql_cond_register("fti", all_ftindex_conds, count);
+
+    toku_mutex_init(fti_probe_mutex_1_key, &fti_probe_mutex_1, NULL);
+    toku_mutex_init(fti_probe_mutex_2_key, &fti_probe_mutex_2, NULL);    
+    toku_mutex_init(fti_probe_mutex_3_key, &fti_probe_mutex_3, NULL);
+    toku_mutex_init(fti_probe_mutex_4_key, &fti_probe_mutex_4, NULL);
 #endif        
 
     r = db_env_set_toku_product_name("tokudb");
@@ -4721,6 +4748,13 @@ void toku_ft_layer_destroy(void) {
     toku_context_status_destroy();
     partitioned_counters_destroy();
     toku_scoped_malloc_destroy();
+
+#ifdef HAVE_PSI_MUTEX_INTERFACE
+    toku_mutex_destroy(&fti_probe_mutex_4);
+    toku_mutex_destroy(&fti_probe_mutex_3);    
+    toku_mutex_destroy(&fti_probe_mutex_2);
+    toku_mutex_destroy(&fti_probe_mutex_1);
+#endif        
 
     //Portability must be cleaned up last
     toku_portability_destroy();

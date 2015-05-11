@@ -876,9 +876,16 @@ env_open(DB_ENV * env, const char *home, uint32_t flags, int mode) {
     env->i->open_flags = flags;
     env->i->open_mode = mode;
 
+    //Instrumentation probe start
+    start_probe1;
+    //probe_start(&probe_mutex_1);
+
     env_setup_real_data_dir(env);
     env_setup_real_log_dir(env);
     env_setup_real_tmp_dir(env);
+
+    stop_probe1;
+    //probe_stop(&probe_mutex_1);
     
     r = toku_single_process_lock(env->i->dir, "environment", &env->i->envdir_lockfd);
     if (r!=0) goto cleanup;
