@@ -205,8 +205,8 @@ extern pfs_key_t rwlock_cond_key;
 extern pfs_key_t rwlock_wait_read_key;    
 extern pfs_key_t rwlock_wait_write_key;
 
-typedef struct rwlock *RWLOCK;
-struct rwlock {
+typedef struct st_rwlock *RWLOCK;
+struct st_rwlock {
     int reader;                  // the number of readers
     int want_read;                // the number of blocked readers
     toku_cond_t wait_read;
@@ -214,6 +214,10 @@ struct rwlock {
     int want_write;              // the number of blocked writers
     toku_cond_t wait_write;
     toku_cond_t* wait_users_go_to_zero;
+#ifdef HAVE_PSI_RWLOCK_INTERFACE    
+    toku_pthread_rwlock_t prwlock;
+#endif
+
 };
 
 // returns: the sum of the number of readers, pending readers, writers, and
@@ -226,7 +230,14 @@ static inline int rwlock_users(RWLOCK rwlock) {
 // initialize a read write lock
 static __attribute__((__unused__))
 void
-rwlock_init(RWLOCK rwlock) {
+rwlock_init(
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+ PSI_rwlock_key psi_key,
+#endif
+ RWLOCK rwlock ) {
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    toku_pthread_rwlock_init(psi_key, &rwlock->prwlock, NULL);
+#endif
     rwlock->reader = rwlock->want_read = 0;
     nonpfs_toku_cond_init(rwlock_wait_read_key, &rwlock->wait_read, 0);
     rwlock->writer = rwlock->want_write = 0;
@@ -245,12 +256,27 @@ rwlock_destroy(RWLOCK rwlock) {
     paranoid_invariant(rwlock->want_write == 0);
     nonpfs_toku_cond_destroy(&rwlock->wait_read);
     nonpfs_toku_cond_destroy(&rwlock->wait_write);
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    toku_pthread_rwlock_destroy(&rwlock->prwlock);
+#endif
 }
 
 // obtain a read lock
 // expects: mutex is locked
 
 static inline void rwlock_read_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    PSI_rwlock_locker *locker;
+    PSI_rwlock_locker_state state;
+
+    if (rwlock->prwlock.psi_rwlock != NULL)
+    {
+      /* Instrumentation start */
+      locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, rwlock->prwlock.psi_rwlock,
+                                              PSI_RWLOCK_READLOCK, __FILE__, __LINE__);
+    }
+#endif
+                                                                              
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     if (rwlock->writer || rwlock->want_write) {
         rwlock->want_read++;
@@ -260,12 +286,21 @@ static inline void rwlock_read_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
         rwlock->want_read--;
     }
     rwlock->reader++;
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    /* Instrumentation end */
+    if (rwlock->prwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+#endif
 }
 
 // release a read lock
 // expects: mutex is locked
 
 static inline void rwlock_read_unlock(RWLOCK rwlock) {
+#ifdef HAVE_PSI_RWLOCK_INTERFACE 
+  if (rwlock->prwlock.psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->prwlock.psi_rwlock);
+#endif
     paranoid_invariant(rwlock->reader > 0);
     paranoid_invariant(rwlock->writer == 0);
     rwlock->reader--;
@@ -281,6 +316,17 @@ static inline void rwlock_read_unlock(RWLOCK rwlock) {
 // expects: mutex is locked
 
 static inline void rwlock_write_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    PSI_rwlock_locker *locker;
+    PSI_rwlock_locker_state state;
+
+    if (rwlock->prwlock.psi_rwlock != NULL)
+    {
+      /* Instrumentation start */
+      locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, rwlock->prwlock.psi_rwlock,
+                                              PSI_RWLOCK_WRITELOCK, __FILE__, __LINE__);
+    }
+#endif
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     if (rwlock->reader || rwlock->writer) {
         rwlock->want_write++;
@@ -290,12 +336,21 @@ static inline void rwlock_write_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
         rwlock->want_write--;
     }
     rwlock->writer++;
+#ifdef HAVE_PSI_RWLOCK_INTERFACE
+    /* Instrumentation end */
+    if (rwlock->prwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+#endif
 }
 
 // release a write lock
 // expects: mutex is locked
 
 static inline void rwlock_write_unlock(RWLOCK rwlock) {
+#ifdef HAVE_PSI_RWLOCK_INTERFACE 
+  if (rwlock->prwlock.psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->prwlock.psi_rwlock);
+#endif
     paranoid_invariant(rwlock->reader == 0);
     paranoid_invariant(rwlock->writer == 1);
     rwlock->writer--;

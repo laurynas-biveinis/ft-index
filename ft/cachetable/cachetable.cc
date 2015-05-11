@@ -118,6 +118,10 @@ pfs_key_t cachetable_m_pending_lock_expensive_key;
 pfs_key_t cachetable_m_pending_lock_cheap_key;
 pfs_key_t cachetable_m_lock_key;
 
+pfs_key_t cachetable_value_key;
+pfs_key_t cachetable_disk_nb_mutex_key;
+pfs_key_t cachetable_disk_nb_rwlock_key;
+
 pfs_key_t cachetable_p_refcount_wait_key;
 pfs_key_t cachetable_m_flow_control_cond_key;
 pfs_key_t cachetable_m_ev_thread_cond_key;
@@ -847,8 +851,8 @@ void pair_init(PAIR p,
 
     p->mutex = list->get_mutex_for_pair(fullhash);
     assert(p->mutex);
-    p->value_rwlock.init(p->mutex);
-    nb_mutex_init(&p->disk_nb_mutex);
+    p->value_rwlock.init(cachetable_value_key, p->mutex);
+    nb_mutex_init(cachetable_disk_nb_mutex_key, cachetable_disk_nb_rwlock_key, &p->disk_nb_mutex);
 
     p->size_evicting_estimate = 0; // <CER> Is zero the correct init value?
 

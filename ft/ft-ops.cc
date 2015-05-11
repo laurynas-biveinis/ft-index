@@ -285,6 +285,8 @@ extern pfs_key_t cachetable_m_mutex_key;
 extern pfs_key_t cachetable_ev_thread_lock_mutex_key;
 extern pfs_key_t log_internal_lock_mutex_key;
 extern pfs_key_t workset_lock_mutex_key;
+extern pfs_key_t safe_file_size_lock_mutex_key;
+extern pfs_key_t cachetable_disk_nb_mutex_key;
 
 //condition vars
 extern pfs_key_t result_state_cond_key;
@@ -314,15 +316,16 @@ extern pfs_key_t cachetable_m_pending_lock_expensive_key;
 extern pfs_key_t cachetable_m_pending_lock_cheap_key;
 extern pfs_key_t cachetable_m_lock_key;
 extern pfs_key_t result_i_open_dbs_rwlock_key;
-//extern pfs_key_t checkpoint_safe_rwlock_key;
-//extern pfs_key_t cachetable_value_key;
+extern pfs_key_t checkpoint_safe_rwlock_key;
+extern pfs_key_t cachetable_value_key;
+extern pfs_key_t safe_file_size_lock_rwlock_key;
+extern pfs_key_t cachetable_disk_nb_rwlock_key;
 
 //extern pfs_key_t treenode_mutex_key;
 //extern pfs_key_t fmutex_cond_key;   
 //extern pfs_key_t circular_buffer_m_lock_mutex_key;
 //extern pfs_key_t circular_buffer_m_push_cond_key; 
 //extern pfs_key_t circular_buffer_m_pop_cond_key;  
-
 
 static PSI_mutex_info   all_ftindex_probe_mutexes[] = {
         {&fti_probe_mutex_1_key,"fti_probe_mutex_1",0},
@@ -368,6 +371,8 @@ static PSI_mutex_info   all_ftindex_mutexes[] = {
         {&tpool_lock_mutex_key, "tpool_lock__mutex", 0},   
         {&cachetable_m_mutex_key, "cachetable_m_mutex", 0},
         {&cachetable_ev_thread_lock_mutex_key, "cachetable_ev_thread_lock_mutex", 0},
+        {&safe_file_size_lock_mutex_key,"safe_file_size_lock_mutex",0},
+        {&cachetable_disk_nb_mutex_key,"cachetable_disk_nb_mutex",0},        
 };
 
 static PSI_cond_info all_ftindex_conds[] = {
@@ -393,21 +398,21 @@ static PSI_cond_info all_ftindex_conds[] = {
             {&tp_thread_wait_key,"tp_thread_wait",0},
             {&tp_pool_wait_free_key,"tp_pool_wait_free",0},
             {&frwlock_m_wait_read_key,"frwlock_m_wait_read",0},
-            {&kibbutz_k_cond_key,"kibbutz_k_cond",0}
+            {&kibbutz_k_cond_key,"kibbutz_k_cond",0},
 };
   
 static PSI_rwlock_info all_ftindex_rwlocks[] = {
             {&multi_operation_lock_key,"multi_operation_lock",0},
             {&low_priority_multi_operation_lock_key,"low_priority_multi_operation_lock",0},
-#if 0
             {&checkpoint_safe_rwlock_key,"checkpoint_safe_rwlock",0},
             {&cachetable_value_key,"cachetable_value",0},                           
-#endif
             {&cachetable_m_list_lock_key,"cachetable_m_list_lock",0},   
             {&cachetable_m_pending_lock_expensive_key,"cachetable_m_pending_lock_expensive",0},
             {&cachetable_m_pending_lock_cheap_key,"cachetable_m_pending_lock_cheap",0},
             {&cachetable_m_lock_key,"cachetable_m_lock",0},
-            {&result_i_open_dbs_rwlock_key,"result_i_open_dbs_rwlock",0}
+            {&result_i_open_dbs_rwlock_key,"result_i_open_dbs_rwlock",0},
+            {&safe_file_size_lock_rwlock_key,"safe_file_size_lock_rwlock",0},
+            {&cachetable_disk_nb_rwlock_key,"cachetable_disk_nb_rwlock",0},        
 };
 
 
