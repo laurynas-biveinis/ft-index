@@ -412,6 +412,7 @@ toku_pthread_rwlock_wrunlock(toku_pthread_rwlock_t *rwlock) {
 #define fti_probe_start(probe_mutex) \
         /* Instrumentation start */ \
         PSI_mutex_locker *locker; \
+        locker=NULL; \
         PSI_mutex_locker_state state; \
         if ((probe_mutex)->psi_mutex != NULL) \
         locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, (probe_mutex)->psi_mutex, PSI_MUTEX_LOCK, __FILE__, __LINE__);

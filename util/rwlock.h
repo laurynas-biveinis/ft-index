@@ -266,7 +266,7 @@ rwlock_destroy(RWLOCK rwlock) {
 
 static inline void rwlock_read_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
 #ifdef HAVE_PSI_RWLOCK_INTERFACE
-    PSI_rwlock_locker *locker;
+    PSI_rwlock_locker *locker=NULL;
     PSI_rwlock_locker_state state;
 
     if (rwlock->prwlock.psi_rwlock != NULL)
@@ -317,7 +317,7 @@ static inline void rwlock_read_unlock(RWLOCK rwlock) {
 
 static inline void rwlock_write_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
 #ifdef HAVE_PSI_RWLOCK_INTERFACE
-    PSI_rwlock_locker *locker;
+    PSI_rwlock_locker *locker=NULL;
     PSI_rwlock_locker_state state;
 
     if (rwlock->prwlock.psi_rwlock != NULL)

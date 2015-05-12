@@ -172,7 +172,7 @@ toku_cond_t *frwlock::deq_item(void) {
 void frwlock::write_lock(bool expensive) {
 
 #ifdef HAVE_PSI_RWLOCK_INTERFACE
-    PSI_rwlock_locker *locker; 
+    PSI_rwlock_locker *locker=NULL; 
     PSI_rwlock_locker_state state;
 
     if (m_rwlock.psi_rwlock != NULL)
@@ -190,7 +190,6 @@ void frwlock::write_lock(bool expensive) {
     if (m_rwlock.psi_rwlock != NULL && locker != NULL)
       PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
 #endif
-
         return;
     }
 
@@ -249,13 +248,12 @@ bool frwlock::try_write_lock(bool expensive) {
     m_current_writer_expensive = expensive;
     m_current_writer_tid = get_local_tid();
     m_blocking_writer_context_id = toku_thread_get_context()->get_id();
-
     return true;
 }
 
 void frwlock::read_lock(void) {
 #ifdef HAVE_PSI_RWLOCK_INTERFACE
-    PSI_rwlock_locker *locker; 
+    PSI_rwlock_locker *locker=NULL; 
     PSI_rwlock_locker_state state;
 
     if (m_rwlock.psi_rwlock != NULL)

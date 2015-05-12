@@ -144,7 +144,7 @@ nb_mutex_destroy(NB_MUTEX nb_mutex) {
 static inline void nb_mutex_lock(NB_MUTEX nb_mutex, toku_mutex_t *mutex) {
  
 #ifdef HAVE_PSI_MUTEX_INTERFACE
-  PSI_mutex_locker *locker;  
+  PSI_mutex_locker *locker=NULL;  
   PSI_mutex_locker_state state;
   if (nb_mutex->toku_mutex.psi_mutex != NULL)
   {
