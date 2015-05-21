@@ -105,10 +105,11 @@ class frwlock {
 public:
 
     void init(
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-              PSI_rwlock_key psi_key,
+              toku_mutex_t *const mutex
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+              ,PSI_rwlock_key psi_key
 #endif
-              toku_mutex_t *const mutex);
+              );
     void deinit(void);
 
     void write_lock(bool expensive);
@@ -169,7 +170,7 @@ private:
     bool m_wait_read_is_in_queue;
 
     toku_cond_t m_wait_read;
-#ifdef HAVE_PSI_RWLOCK_INTERFACE    
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)    
     toku_pthread_rwlock_t  m_rwlock;
 #endif
     queue_item *m_wait_head;

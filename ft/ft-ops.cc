@@ -4705,9 +4705,6 @@ int toku_dump_ft(FILE *f, FT_HANDLE ft_handle) {
 int toku_ft_layer_init(void) {
     int r = 0;
     int count;
-    //Portability must be initialized first
-    r = toku_portability_init();
-    if (r) { goto exit; }
 
 #ifdef HAVE_PSI_INTERFACE
     count = array_elements(all_ftindex_probe_mutexes);
@@ -4721,7 +4718,12 @@ int toku_ft_layer_init(void) {
   
     count = array_elements(all_ftindex_conds);
     mysql_cond_register("fti", all_ftindex_conds, count);
+#endif
+    //Portability must be initialized first
+    r = toku_portability_init();
+    if (r) { goto exit; }
 
+#ifdef HAVE_PSI_MUTEX_INTERFACE
     toku_mutex_init(fti_probe_mutex_1_key, &fti_probe_mutex_1, NULL);
     toku_mutex_init(fti_probe_mutex_2_key, &fti_probe_mutex_2, NULL);    
     toku_mutex_init(fti_probe_mutex_3_key, &fti_probe_mutex_3, NULL);

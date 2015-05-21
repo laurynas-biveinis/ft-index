@@ -107,10 +107,11 @@ static int get_local_tid() {
 }
 
 void frwlock::init(
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
- PSI_rwlock_key psi_key,
+ toku_mutex_t *const mutex
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+ ,PSI_rwlock_key psi_key
 #endif
- toku_mutex_t *const mutex ) {
+  ) {
     m_mutex = mutex;
 
     m_num_readers = 0;
@@ -120,7 +121,7 @@ void frwlock::init(
     m_num_signaled_readers = 0;
     m_num_expensive_want_write = 0;
     
-    #ifdef HAVE_PSI_RWLOCK_INTERFACE
+    #if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
       toku_pthread_rwlock_init(psi_key, &m_rwlock, NULL);                                                
     #endif
 //    toku_cond_init(frwlock_m_wait_read_key, &m_wait_read, nullptr);
@@ -139,7 +140,9 @@ void frwlock::init(
 
 void frwlock::deinit(void) {
     nonpfs_toku_cond_destroy(&m_wait_read);
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
     toku_pthread_rwlock_destroy(&m_rwlock);
+#endif
 }
 
 bool frwlock::queue_is_empty(void) const {
@@ -171,7 +174,7 @@ toku_cond_t *frwlock::deq_item(void) {
 // Prerequisite: Holds m_mutex.
 void frwlock::write_lock(bool expensive) {
 
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
     PSI_rwlock_locker *locker=NULL; 
     PSI_rwlock_locker_state state;
 
@@ -185,7 +188,7 @@ void frwlock::write_lock(bool expensive) {
 
     toku_mutex_assert_locked(m_mutex);
     if (this->try_write_lock(expensive)) {
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
     /* Instrumentation end */
     if (m_rwlock.psi_rwlock != NULL && locker != NULL)
       PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
@@ -228,7 +231,7 @@ void frwlock::write_lock(bool expensive) {
     m_current_writer_tid = get_local_tid();
     m_blocking_writer_context_id = toku_thread_get_context()->get_id();
 
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
     /* Instrumentation end */
     if (m_rwlock.psi_rwlock != NULL && locker != NULL)
       PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
@@ -252,7 +255,7 @@ bool frwlock::try_write_lock(bool expensive) {
 }
 
 void frwlock::read_lock(void) {
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
     PSI_rwlock_locker *locker=NULL; 
     PSI_rwlock_locker_state state;
 
@@ -298,7 +301,7 @@ void frwlock::read_lock(void) {
         --m_num_signaled_readers;
     }
     ++m_num_readers;
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
     /* Instrumentation end */
     if (m_rwlock.psi_rwlock != NULL && locker != NULL)
       PSI_RWLOCK_CALL(end_rwlock_rdwait)(locker, 0);
@@ -329,7 +332,7 @@ void frwlock::maybe_signal_next_writer(void) {
 }
 
 void frwlock::read_unlock(void) {
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
   if (m_rwlock.psi_rwlock != NULL)
     PSI_RWLOCK_CALL(unlock_rwlock)(m_rwlock.psi_rwlock);
 #endif
@@ -377,7 +380,7 @@ void frwlock::maybe_signal_or_broadcast_next(void) {
 }
 
 void frwlock::write_unlock(void) {
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
   if (m_rwlock.psi_rwlock != NULL)
     PSI_RWLOCK_CALL(unlock_rwlock)(m_rwlock.psi_rwlock);
 #endif

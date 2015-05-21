@@ -851,7 +851,11 @@ void pair_init(PAIR p,
 
     p->mutex = list->get_mutex_for_pair(fullhash);
     assert(p->mutex);
-    p->value_rwlock.init(cachetable_value_key, p->mutex);
+    p->value_rwlock.init(p->mutex
+ #if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    , cachetable_value_key
+ #endif
+    );
     nb_mutex_init(cachetable_disk_nb_mutex_key, cachetable_disk_nb_rwlock_key, &p->disk_nb_mutex);
 
     p->size_evicting_estimate = 0; // <CER> Is zero the correct init value?

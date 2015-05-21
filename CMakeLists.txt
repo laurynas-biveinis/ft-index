@@ -9,7 +9,9 @@ set(CMAKE_SHARED_LIBRARY_LINK_CXX_FLAGS "")
 
 # detect when we are being built as a subproject
 if (DEFINED MYSQL_PROJECT_NAME_DOCSTRING)
-  add_definitions( -DMYSQL_TOKUDB_ENGINE=1 )
+  add_definitions( -DMYSQL_TOKUDB_ENGINE=1)
+  #Extended PFS instrumentation: -DTOKU_PFS_EXTENDED_RWLOCKH=1  -DTOKU_PFS_EXTENDED_FRWLOCKH=1 -DTOKU_PFS_EXTENDED_NBMUTEXH=1
+  add_definitions( -DTOKU_PFS_EXTENDED_FRWLOCKH=1 -DTOKU_PFS_EXTENDED_NBMUTEXH=1) 
 endif ()
 
 ## Versions of gcc >= 4.9.0 require special version of 'ar' and 'ranlib' for
