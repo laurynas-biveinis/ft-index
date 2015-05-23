@@ -102,6 +102,7 @@ pfs_key_t manager_mutex_key;
 pfs_key_t manager_escalation_mutex_key;
 pfs_key_t manger_escalator_mutex_key;
 pfs_key_t manager_m_escalator_done_key;
+extern pfs_key_t treenode_mutex_key;
 
 namespace toku {
 

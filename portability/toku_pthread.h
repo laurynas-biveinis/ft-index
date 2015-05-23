@@ -114,9 +114,11 @@ typedef struct timespec toku_timespec_t;
 typedef unsigned int    pfs_key_t;
 
 #ifndef MYSQL_TOKUDB_ENGINE
+#  undef HAVE_PSI_INTERFACE
 #  undef HAVE_PSI_RWLOCK_INTERFACE
 #  undef HAVE_PSI_COND_INTERFACE
 #  undef HAVE_PSI_MUTEX_INTERFACE
+#  undef HAVE_PSI_THREAD_INTERFACE
 #endif
 
 #ifndef TOKU_PTHREAD_DEBUG
@@ -133,7 +135,9 @@ typedef struct toku_mutex {
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
     struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
+#if TOKU_PFS_PTHREAD_DEBUG
     pfs_key_t psi_key;
+#endif    
 #endif
 
 } toku_mutex_t;
@@ -146,6 +150,9 @@ typedef struct toku_cond {
     pthread_cond_t pcond;
 #ifdef HAVE_PSI_COND_INTERFACE
     struct PSI_cond *psi_cond;
+#if TOKU_PFS_PTHREAD_DEBUG
+    pfs_key_t psi_key;
+#endif    
 #endif
 } toku_cond_t;
 
@@ -153,6 +160,9 @@ typedef struct toku_rwlock {
     pthread_rwlock_t rwlock;
 #ifdef HAVE_PSI_RWLOCK_INTERFACE
     struct PSI_rwlock *psi_rwlock;
+#if TOKU_PFS_PTHREAD_DEBUG
+    pfs_key_t psi_key;
+#endif    
 #endif
 } toku_pfs_rwlock_t;
 
@@ -417,17 +427,16 @@ toku_pthread_rwlock_wrunlock(toku_pthread_rwlock_t *rwlock) {
         locker=NULL; \
         PSI_mutex_locker_state state; \
         if ((probe_mutex)->psi_mutex != NULL) \
-        locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, (probe_mutex)->psi_mutex, PSI_MUTEX_LOCK, __FILE__, __LINE__);
+        locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, (probe_mutex)->psi_mutex, PSI_MUTEX_LOCK, __FILE__, __LINE__); 
 
 #define fti_probe_stop(probe_mutex) \
         /* Instrumentation end */ \
         if ((probe_mutex)->psi_mutex != NULL && locker != NULL) \
-           PSI_MUTEX_CALL(end_mutex_wait)(locker, 0);
-
+           PSI_MUTEX_CALL(end_mutex_wait)(locker, 0); 
 #else
 
-#define fti_probe_start(probe_mutex) ; 
-#define fti_probe_stop(probe_mutex) ;
+#define fti_probe_start(probe_mutex) do {} while (0); 
+#define fti_probe_stop(probe_mutex) do {} while (0);
 
 #endif
 
@@ -473,13 +482,13 @@ static inline void inline_toku_mutex_init(
   )
 {
 #ifdef HAVE_PSI_MUTEX_INTERFACE
-    //fprintf(stderr,"mutex_init: key %d \n",key);
-    mutex->psi_key= key;
     mutex->psi_mutex= PSI_MUTEX_CALL(init_mutex)(key, &mutex->pmutex);
-    if (mutex->psi_mutex != NULL)
-    {
-      fprintf(stderr,"mutex_init: key %d NOT NULL \n",key);
-    }
+#if TOKU_PFS_PTHREAD_DEBUG
+    mutex->psi_key= key;
+    if (key != PFS_NOT_INSTRUMENTED && mutex->psi_mutex == NULL )
+      fprintf(stderr,"initing tokudb mutex: key: %d NULL\n", key);
+#endif
+        
 #endif
     int r = pthread_mutex_init(&mutex->pmutex, attr);
     assert_zero(r);   
@@ -504,7 +513,6 @@ static inline void inline_toku_mutex_destroy(
 #ifdef HAVE_PSI_MUTEX_INTERFACE
   if (mutex->psi_mutex != NULL)
   {
-    fprintf(stderr,"mutex_destroy: key %d NOT NULL \n",mutex->psi_key);
     PSI_MUTEX_CALL(destroy_mutex)(mutex->psi_mutex);
     mutex->psi_mutex= NULL;
   }
@@ -512,9 +520,6 @@ static inline void inline_toku_mutex_destroy(
     int r = pthread_mutex_destroy(&mutex->pmutex);
     assert_zero(r);
 }
-
-
-
 
 static inline void inline_toku_mutex_lock(
   toku_mutex_t *mutex
@@ -535,6 +540,10 @@ static inline void inline_toku_mutex_lock(
     /* Instrumentation start */
     locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, mutex->psi_mutex,
                                        PSI_MUTEX_LOCK, src_file, src_line);
+#if TOKU_PFS_PTHREAD_DEBUG
+    if (locker == NULL)
+       fprintf(stderr, "Can't start timer for mutex key: %d\n", mutex->psi_key);
+#endif
   }
   /* Instrumented code */
   r = pthread_mutex_lock(&mutex->pmutex);
@@ -695,6 +704,11 @@ static inline void inline_toku_cond_init(
 {
 #ifdef HAVE_PSI_COND_INTERFACE
   cond->psi_cond= PSI_COND_CALL(init_cond)(key, &cond->psi_cond);
+#if TOKU_PFS_PTHREAD_DEBUG
+  cond->psi_key= key;
+  if (key != PFS_NOT_INSTRUMENTED && cond->psi_cond == NULL )
+      fprintf(stderr,"initing tokudb cond_var: key: %d NULL\n", key);
+#endif
 #endif
   int r = pthread_cond_init(&cond->pcond, attr);
   assert_zero(r);
@@ -781,19 +795,20 @@ static inline int inline_toku_cond_timedwait(
   PSI_cond_locker *locker;
   locker= NULL;   
   PSI_cond_locker_state state;
+
   if (cond->psi_cond != NULL)
   {
     /* Instrumentation start */
-
     locker= PSI_COND_CALL(start_cond_wait)(&state, cond->psi_cond, mutex->psi_mutex,
                                            PSI_COND_TIMEDWAIT, src_file, src_line);
   }
+
   /* Instrumented code */
   r= pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
 
   /* Instrumentation end */
   if (locker != NULL)
-      PSI_COND_CALL(end_cond_wait)(locker, r);
+    PSI_COND_CALL(end_cond_wait)(locker, r);
 #else
   /* Non instrumented code */
   r= pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
@@ -870,6 +885,11 @@ static inline void inline_toku_pthread_rwlock_init(
 {
 #ifdef HAVE_PSI_RWLOCK_INTERFACE
   rwlock->psi_rwlock= PSI_RWLOCK_CALL(init_rwlock)(key, &rwlock->rwlock);
+#if TOKU_PFS_PTHREAD_DEBUG
+  rwlock->psi_key= key;
+  if (key != PFS_NOT_INSTRUMENTED && rwlock->psi_rwlock == NULL )
+      fprintf(stderr,"initing tokudb rwlock: key: %d NULL\n", key);
+#endif
 #endif
   int r = pthread_rwlock_init(&rwlock->rwlock, attr);
   assert_zero(r);
@@ -982,10 +1002,60 @@ static inline void inline_toku_pthread_rwlock_wrunlock(
 
 #endif /* TOKU_PTHREAD_OLD  */
 
+#ifdef HAVE_PSI_THREAD_INTERFACE
+  #define toku_pthread_create(K, P1, P2, P3, P4) \
+    inline_toku_pthread_create(K, P1, P2, P3, P4)
+#else
+  #define toku_pthread_create(K, P1, P2, P3, P4) \
+    inline_toku_pthread_create(P1, P2, P3, P4)
+#endif
+
+#ifdef HAVE_PSI_THREAD_INTERFACE_5
+static inline void inline_toku_thread_set_psi_id(ulong id)
+{
+  struct PSI_thread *psi= PSI_THREAD_CALL(get_thread)();
+  PSI_THREAD_CALL(set_thread_id)(psi, id);
+}
+#endif
 
 static inline int 
-toku_pthread_create(toku_pthread_t *thread, const toku_pthread_attr_t *attr, void *(*start_function)(void *), void *arg) {
-    return pthread_create(thread, attr, start_function, arg);
+inline_toku_pthread_create(
+#ifdef HAVE_PSI_THREAD_INTERFACE
+   PSI_thread_key key,
+#endif
+toku_pthread_t *thread, const toku_pthread_attr_t *attr, void *(*start_function)(void *), void *arg) {
+    int result;
+#ifdef HAVE_PSI_THREAD_INTERFACE
+    result= PSI_THREAD_CALL(spawn_thread)(key, thread, attr, start_function, arg);
+#else
+    result= pthread_create(thread, attr, start_function, arg);
+#endif    
+    return result;
+}
+
+#ifdef HAVE_PSI_THREAD_INTERFACE
+
+#  define toku_pfs_register_thread(key)                      \
+do {                                                            \
+        struct PSI_thread* psi = PSI_THREAD_CALL(new_thread)(key, NULL, 0);\
+        PSI_THREAD_CALL(set_thread)(psi);                       \
+} while (0)
+
+/* This macro delist the current thread from performance schema */
+#  define toku_pfs_delete_thread()                           \
+do {                                                            \
+        PSI_THREAD_CALL(delete_current_thread)();               \
+} while (0)
+
+#else
+#  define toku_pfs_register_thread(key) do {} while (0)
+#  define toku_pfs_delete_thread() do {} while (0)
+#endif
+
+static inline void *
+toku_pthread_done(void* exit_value) {
+    toku_pfs_delete_thread();
+    return(exit_value);
 }
 
 static inline int 

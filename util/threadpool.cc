@@ -104,6 +104,7 @@ PATENT RIGHTS GRANT:
 pfs_key_t tpool_lock_mutex_key;
 pfs_key_t tp_thread_wait_key;
 pfs_key_t tp_pool_wait_free_key;
+pfs_key_t tp_internal_thread_key;
 
 struct toku_thread {
     struct toku_thread_pool *pool;
@@ -142,7 +143,7 @@ toku_thread_create(struct toku_thread_pool *pool, struct toku_thread **toku_thre
         memset(thread, 0, sizeof *thread);
         thread->pool = pool;
         toku_cond_init(tp_thread_wait_key,&thread->wait, nullptr);
-        r = toku_pthread_create(&thread->tid, nullptr, toku_thread_run_internal, thread);
+        r = toku_pthread_create(tp_internal_thread_key, &thread->tid, nullptr, toku_thread_run_internal, thread);
         if (r) {
             toku_cond_destroy(&thread->wait);
             toku_free(thread);
@@ -204,7 +205,7 @@ toku_thread_run_internal(void *arg) {
         thread->f = nullptr;
         toku_list_push(&pool->free_threads, &thread->free_link);
     }
-    return arg;
+    return toku_pthread_done(arg);
 }      
 
 int 

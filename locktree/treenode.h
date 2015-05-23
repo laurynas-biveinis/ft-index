@@ -100,6 +100,8 @@ PATENT RIGHTS GRANT:
 #include "ft/txn/txn.h"
 #include "locktree/keyrange.h"
 
+extern pfs_key_t treenode_mutex_key;
+
 namespace toku {
 
 // a node in a tree with its own mutex

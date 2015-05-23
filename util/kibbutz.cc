@@ -122,6 +122,7 @@ static void *work_on_kibbutz (void *);
 
 pfs_key_t kibbutz_mutex_key;
 pfs_key_t kibbutz_k_cond_key;
+pfs_key_t kibbutz_thread_key;
 
 int toku_kibbutz_create (int n_workers, KIBBUTZ *kb_ret) {
     int r = 0;
@@ -137,7 +138,7 @@ int toku_kibbutz_create (int n_workers, KIBBUTZ *kb_ret) {
     XMALLOC_N(n_workers, k->ids);
     for (int i = 0; i < n_workers; i++) {
         k->ids[i].k = k;
-        r = toku_pthread_create(&k->workers[i], NULL, work_on_kibbutz, &k->ids[i]);
+        r = toku_pthread_create(kibbutz_thread_key, &k->workers[i], NULL, work_on_kibbutz, &k->ids[i]);
         if (r != 0) {
             k->n_workers = i;
             toku_kibbutz_destroy(k);
@@ -193,7 +194,7 @@ static void *work_on_kibbutz (void *kidv) {
             // Don't follow this unless the work is all done, so that when we set please_shutdown, all the work finishes before any threads quit.
             ksignal(k); // must wake up anyone else who is waiting, so they can shut down.
             kunlock(k);
-            return NULL;
+            return toku_pthread_done(NULL);
         }
         // There is no work to do and it's not time to shutdown, so wait.
         kwait(k);

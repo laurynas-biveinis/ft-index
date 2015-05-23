@@ -153,6 +153,10 @@ env_panic(DB_ENV * env, int cause, const char * msg) {
 }
 
 pfs_key_t result_i_open_dbs_rwlock_key;
+pfs_key_t treenode_mutex_key;
+pfs_key_t circular_buffer_m_lock_mutex_key;
+pfs_key_t circular_buffer_m_push_cond_key;
+pfs_key_t circular_buffer_m_pop_cond_key;
 
 static int env_get_engine_status_num_rows (DB_ENV * UU(env), uint64_t * num_rowsp);
 

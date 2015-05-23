@@ -127,6 +127,7 @@ pfs_key_t cachetable_m_flow_control_cond_key;
 pfs_key_t cachetable_m_ev_thread_cond_key;
 
 pfs_key_t log_internal_lock_mutex_key;
+pfs_key_t eviction_thread_key;
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
@@ -3290,7 +3291,11 @@ void pair_list::init() {
     XCALLOC_N(m_table_size, m_table);
     XCALLOC_N(m_num_locks, m_mutexes);
     for (uint64_t i = 0; i < m_num_locks; i++) {
+#ifdef TOKU_PFS_MUTEX_EXTENDED_CACHETABLEMMUTEX
         toku_mutex_init(cachetable_m_mutex_key, &m_mutexes[i].aligned_mutex, NULL);
+#else
+        toku_mutex_init(PFS_NOT_INSTRUMENTED, &m_mutexes[i].aligned_mutex, NULL);
+#endif
     }
 }
 
@@ -3632,7 +3637,7 @@ ENSURE_POD(evictor);
 static void *eviction_thread(void *evictor_v) {
     evictor* CAST_FROM_VOIDP(evictor, evictor_v);
     evictor->run_eviction_thread();
-    return evictor_v;
+    return toku_pthread_done(evictor_v);
 }
 
 //
@@ -3695,7 +3700,7 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_run_thread = true;
     m_num_eviction_thread_runs = 0;
     m_ev_thread_init = false;
-    r = toku_pthread_create(&m_ev_thread, NULL, eviction_thread, this); 
+    r = toku_pthread_create(eviction_thread_key, &m_ev_thread, NULL, eviction_thread, this); 
     if (r == 0) {
         m_ev_thread_init = true;
     }

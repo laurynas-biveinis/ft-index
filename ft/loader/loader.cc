@@ -119,6 +119,9 @@ pfs_key_t loader_bl_mutex_key;
 pfs_key_t loader_fi_lock_mutex_key;
 pfs_key_t loader_out_mutex_key;
 
+pfs_key_t extractor_thread_key;
+pfs_key_t fractal_thread_key;
+
 static size_t (*os_fwrite_fun)(const void *,size_t,size_t,FILE*)=NULL;
 void ft_loader_set_os_fwrite (size_t (*fwrite_fun)(const void*,size_t,size_t,FILE*)) {
     os_fwrite_fun=fwrite_fun;
@@ -693,7 +696,7 @@ int toku_ft_loader_open (FTLOADER *blp, /* out */
     }
     if (result==0 && allow_puts) {
         FTLOADER bl = *blp;
-        int r = toku_pthread_create(&bl->extractor_thread, NULL, extractor_thread, (void*)bl); 
+        int r = toku_pthread_create(extractor_thread_key, &bl->extractor_thread, NULL, extractor_thread, (void*)bl); 
         if (r==0) {
             bl->extractor_live = true;
         } else  { 
@@ -1168,7 +1171,7 @@ static void* extractor_thread (void *blv) {
             ft_loader_set_panic(bl, r, false, 0, nullptr, nullptr);
         
     }
-    return NULL;
+    return toku_pthread_done(NULL);
 }
 
 static void enqueue_for_extraction (FTLOADER bl) {
@@ -2711,7 +2714,7 @@ static void* fractal_thread (void *ftav) {
     struct fractal_thread_args *fta = (struct fractal_thread_args *)ftav;
     int r = toku_loader_write_ft_from_q (fta->bl, fta->descriptor, fta->fd, fta->progress_allocation, fta->q, fta->total_disksize_estimate, fta->which_db, fta->target_nodesize, fta->target_basementnodesize, fta->target_compression_method, fta->target_fanout);
     fta->errno_result = r;
-    return NULL;
+    return  toku_pthread_done(NULL);
 }
 
 static int loader_do_i (FTLOADER bl,
@@ -2772,7 +2775,7 @@ static int loader_do_i (FTLOADER bl,
                 target_fanout
             };
 
-            r = toku_pthread_create(bl->fractal_threads+which_db, NULL, fractal_thread, (void*)&fta);
+            r = toku_pthread_create(fractal_thread_key, bl->fractal_threads+which_db, NULL, fractal_thread, (void*)&fta);
             if (r) {
                 int r2 __attribute__((__unused__)) = toku_queue_destroy(bl->fractal_queues[which_db]);            
                 // ignore r2, since we already have an error

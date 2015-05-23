@@ -241,6 +241,7 @@ static FT_STATUS_S ft_status;
 
 static toku_mutex_t ft_open_close_lock;
 
+#ifdef HAVE_PSI_INTERFACE
 //probe mutexes
 toku_mutex_t  fti_probe_mutex_1; 
 toku_mutex_t  fti_probe_mutex_2; 
@@ -287,6 +288,8 @@ extern pfs_key_t log_internal_lock_mutex_key;
 extern pfs_key_t workset_lock_mutex_key;
 extern pfs_key_t safe_file_size_lock_mutex_key;
 extern pfs_key_t cachetable_disk_nb_mutex_key;
+extern pfs_key_t treenode_mutex_key;
+extern pfs_key_t circular_buffer_m_lock_mutex_key;
 
 //condition vars
 extern pfs_key_t result_state_cond_key;
@@ -307,6 +310,9 @@ extern pfs_key_t tp_thread_wait_key;
 extern pfs_key_t tp_pool_wait_free_key;
 extern pfs_key_t frwlock_m_wait_read_key;
 extern pfs_key_t kibbutz_k_cond_key;
+extern pfs_key_t minicron_p_condvar_key;
+extern pfs_key_t circular_buffer_m_push_cond_key; 
+extern pfs_key_t circular_buffer_m_pop_cond_key;  
 
 //rwlocks
 extern pfs_key_t multi_operation_lock_key;
@@ -321,11 +327,26 @@ extern pfs_key_t cachetable_value_key;
 extern pfs_key_t safe_file_size_lock_rwlock_key;
 extern pfs_key_t cachetable_disk_nb_rwlock_key;
 
-//extern pfs_key_t treenode_mutex_key;
+//threads
+extern pfs_key_t extractor_thread_key;
+extern pfs_key_t fractal_thread_key;
+extern pfs_key_t io_thread_key;
+extern pfs_key_t eviction_thread_key;
+extern pfs_key_t kibbutz_thread_key;
+extern pfs_key_t minicron_thread_key;
+extern pfs_key_t tp_internal_thread_key;
+
 //extern pfs_key_t fmutex_cond_key;   
-//extern pfs_key_t circular_buffer_m_lock_mutex_key;
-//extern pfs_key_t circular_buffer_m_push_cond_key; 
-//extern pfs_key_t circular_buffer_m_pop_cond_key;  
+
+static PSI_thread_info  all_ftindex_threads[] = {
+        {&extractor_thread_key, "extractor_thread", 0},
+        {&fractal_thread_key, "fractal_thread", 0},
+        {&io_thread_key, "io_thread", 0},
+        {&eviction_thread_key, "eviction_thread", 0},
+        {&kibbutz_thread_key, "kibbutz_thread", 0},
+        {&minicron_thread_key, "minicron_thread", 0},
+        {&tp_internal_thread_key, "tp_internal_thread", 0},
+};
 
 static PSI_mutex_info   all_ftindex_probe_mutexes[] = {
         {&fti_probe_mutex_1_key,"fti_probe_mutex_1",0},
@@ -346,10 +367,8 @@ static PSI_mutex_info   all_ftindex_mutexes[] = {
         {&block_table_mutex_key, "block_table_mutex", 0},
         {&workset_lock_mutex_key, "workset_lock_mutex", 0},
         {&log_internal_lock_mutex_key, "log_internal_lock_mutex", 0},
-#if 0
         {&circular_buffer_m_lock_mutex_key, "circular_buffer_m_lock_mutex", 0},
         {&treenode_mutex_key, "treenode_mutex", 0},
-#endif
         {&ft_open_close_lock_mutex_key, "ft_open_close_lock_mutex", 0},
         {&bjm_jobs_lock_mutex_key, "bjm_jobs_lock_mutex", 0},
         {&checkpoint_safe_mutex_key, "checkpoint_safe_mutex", 0},
@@ -386,11 +405,12 @@ static PSI_cond_info all_ftindex_conds[] = {
             {&result_output_condition_key,"result_output_condition",0},
             {&manager_m_escalator_done_key,"manager_m_escalator_done",0},
             {&lock_request_m_wait_cond_key,"lock_request_m_wait_cond",0},
-#if 0
             {&circular_buffer_m_push_cond_key,"circular_buffer_m_push_cond",0},
             {&circular_buffer_m_pop_cond_key,"circular_buffer_m_pop_cond",0},  
+#if 0 
             {&fmutex_cond_key,"fmutex_cond",0},
 #endif
+            {&minicron_p_condvar_key,"minicron_p_condvar",0},
             {&queue_result_cond_key,"queue_result_cond",0},
             {&rwlock_wait_read_key,"rwlock_wait_read",0},  
             {&rwlock_wait_write_key,"rwlock_wait_write",0},
@@ -415,6 +435,7 @@ static PSI_rwlock_info all_ftindex_rwlocks[] = {
             {&cachetable_disk_nb_rwlock_key,"cachetable_disk_nb_rwlock",0},        
 };
 
+#endif
 
 static void
 status_init(void)
@@ -4704,9 +4725,14 @@ int toku_dump_ft(FILE *f, FT_HANDLE ft_handle) {
 
 int toku_ft_layer_init(void) {
     int r = 0;
-    int count;
+
+    //Portability must be initialized first
+    r = toku_portability_init();
+    if (r) { goto exit; }
 
 #ifdef HAVE_PSI_INTERFACE
+    int count;
+
     count = array_elements(all_ftindex_probe_mutexes);
     mysql_mutex_register("fti", all_ftindex_probe_mutexes, count);
 
@@ -4718,10 +4744,10 @@ int toku_ft_layer_init(void) {
   
     count = array_elements(all_ftindex_conds);
     mysql_cond_register("fti", all_ftindex_conds, count);
+
+    count = array_elements(all_ftindex_threads);
+    mysql_thread_register("fti", all_ftindex_threads, count);
 #endif
-    //Portability must be initialized first
-    r = toku_portability_init();
-    if (r) { goto exit; }
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
     toku_mutex_init(fti_probe_mutex_1_key, &fti_probe_mutex_1, NULL);
