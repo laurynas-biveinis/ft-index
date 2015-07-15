@@ -696,7 +696,7 @@ validate_env(DB_ENV * env, bool * valid_newenv, bool need_rollback_cachefile) {
     // Test for persistent environment
     path = toku_construct_full_name(2, env->i->dir, toku_product_name_strings.environmentdictionary);
     assert(path);
-    r = toku_stat(path, &buf);
+    r = toku_stat(path, &buf, PFS_NOT_INSTRUMENTED);
     if (r == 0) {
         expect_newenv = false;  // persistent info exists
     }
@@ -717,7 +717,7 @@ validate_env(DB_ENV * env, bool * valid_newenv, bool need_rollback_cachefile) {
     if (r == 0 && need_rollback_cachefile) {
         path = toku_construct_full_name(2, env->i->dir, toku_product_name_strings.rollback_cachefile);
         assert(path);
-        r = toku_stat(path, &buf);
+        r = toku_stat(path, &buf, PFS_NOT_INSTRUMENTED);
         if (r == 0) {  
             if (expect_newenv)  // rollback cachefile exists, but persistent env is missing
                 r = toku_ydb_do_error(env, ENOENT, "Persistent environment is missing\n");
@@ -742,7 +742,7 @@ validate_env(DB_ENV * env, bool * valid_newenv, bool need_rollback_cachefile) {
     if (r == 0) {
         path = toku_construct_full_name(2, env->i->dir, toku_product_name_strings.fileopsdirectory);
         assert(path);
-        r = toku_stat(path, &buf);
+        r = toku_stat(path, &buf, PFS_NOT_INSTRUMENTED);
         if (r == 0) {  
             if (expect_newenv)  // fileops directory exists, but persistent env is missing
                 r = toku_ydb_do_error(env, ENOENT, "Persistent environment is missing\n");
@@ -861,7 +861,7 @@ env_open(DB_ENV * env, const char *home, uint32_t flags, int mode) {
 
     // Verify that the home exists.
     toku_struct_stat buf;
-    r = toku_stat(home, &buf);
+    r = toku_stat(home, &buf, PFS_NOT_INSTRUMENTED);
     if (r != 0) {
         int e = get_error_errno();
         r = toku_ydb_do_error(env, e, "Error from toku_stat(\"%s\",...)\n", home);

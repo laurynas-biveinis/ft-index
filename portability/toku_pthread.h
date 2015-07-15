@@ -98,9 +98,12 @@ PATENT RIGHTS GRANT:
 #include "toku_assert.h"
 
 #ifdef MYSQL_TOKUDB_ENGINE
-# include <my_pthread.h>
-# include <mysql/plugin.h>
+//# include <my_pthread.h>
+//# include <mysql/plugin.h>
+# include <toku_pfs.h>
 #endif
+
+
 
 typedef pthread_attr_t toku_pthread_attr_t;
 typedef pthread_t toku_pthread_t;
@@ -111,7 +114,6 @@ typedef pthread_cond_t toku_pthread_cond_t;
 typedef pthread_rwlockattr_t  toku_pthread_rwlockattr_t;
 typedef pthread_key_t toku_pthread_key_t;
 typedef struct timespec toku_timespec_t;
-typedef unsigned int    pfs_key_t;
 
 #ifndef MYSQL_TOKUDB_ENGINE
 #  undef HAVE_PSI_INTERFACE
@@ -386,8 +388,6 @@ toku_pthread_rwlock_wrunlock(toku_pthread_rwlock_t *rwlock) {
 
 #else /* TOKU_PTHREAD_OLD */
 
-#define ULINT32_UNDEFINED              0xFFFFFFFF
-#define PFS_NOT_INSTRUMENTED           ULINT32_UNDEFINED
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
     #define toku_mutex_init(K, M, A) \

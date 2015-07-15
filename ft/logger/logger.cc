@@ -106,6 +106,7 @@ static const int log_format_version=TOKU_LOG_VERSION;
 
 pfs_key_t result_output_condition_lock_mutex_key;
 pfs_key_t result_output_condition_key;
+pfs_key_t tokudb_file_log_key;
 
 static int open_logfile (TOKULOGGER logger);
 static void logger_write_buffer (TOKULOGGER logger, LSN *fsynced_lsn);
@@ -359,7 +360,8 @@ int toku_logger_close(TOKULOGGER *loggerp) {
         if ( logger->write_log_files ) {
             toku_file_fsync_without_accounting(logger->fd);
         }
-        r = close(logger->fd);
+        //r = close(logger->fd);
+        r = toku_os_close(logger->fd);
         assert(r == 0);
     }
     r = close_logdir(logger);
@@ -403,7 +405,10 @@ static int close_and_open_logfile (TOKULOGGER logger, LSN *fsynced_lsn)
         *fsynced_lsn = logger->written_lsn;
         toku_logfilemgr_update_last_lsn(logger->logfilemgr, logger->written_lsn);          // fixes t:2294
     }
-    r = close(logger->fd);                               if (r!=0) return get_error_errno();
+//    r = close(logger->fd);
+    r = toku_os_close(logger->fd);
+    
+    if (r!=0) return get_error_errno();
     return open_logfile(logger);
 }
 
@@ -736,14 +741,16 @@ static int open_logfile (TOKULOGGER logger)
     snprintf(fname, fnamelen, "%s/log%012lld.tokulog%d", logger->directory, logger->next_log_file_number, TOKU_LOG_VERSION);
     long long index = logger->next_log_file_number;
     if (logger->write_log_files) {
-        logger->fd = open(fname, O_CREAT+O_WRONLY+O_TRUNC+O_EXCL+O_BINARY, S_IRUSR+S_IWUSR);
+//        logger->fd = open(fname, O_CREAT+O_WRONLY+O_TRUNC+O_EXCL+O_BINARY, S_IRUSR+S_IWUSR);
+          logger->fd = toku_os_open(fname, O_CREAT+O_WRONLY+O_TRUNC+O_EXCL+O_BINARY, S_IRUSR+S_IWUSR, tokudb_file_log_key);
         if (logger->fd==-1) {
             return get_error_errno();
         }
         fsync_logdir(logger);
         logger->next_log_file_number++;
     } else {
-        logger->fd = open(DEV_NULL_FILE, O_WRONLY+O_BINARY);
+//        logger->fd = open(DEV_NULL_FILE, O_WRONLY+O_BINARY);
+          logger->fd = toku_os_open(DEV_NULL_FILE, O_WRONLY+O_BINARY, S_IWUSR, tokudb_file_log_key);
         if (logger->fd==-1) {
             return get_error_errno();
         }
@@ -893,7 +900,9 @@ int toku_logger_restart(TOKULOGGER logger, LSN lastlsn)
     if ( logger->write_log_files) { // fsyncs don't work to /dev/null
         toku_file_fsync_without_accounting(logger->fd);
     }
-    r = close(logger->fd);                              assert(r == 0);
+    //r = close(logger->fd);
+    r = toku_os_close(logger->fd);
+    assert(r == 0);
     logger->fd = -1;
 
     // reset the LSN's to the lastlsn when the logger was opened
@@ -1294,7 +1303,8 @@ void toku_txnid2txn(TOKULOGGER logger, TXNID_PAIR txnid, TOKUTXN *result) {
 
 // Find the earliest LSN in a log.  No locks are needed.
 static int peek_at_log (TOKULOGGER logger, char* filename, LSN *first_lsn) {
-    int fd = open(filename, O_RDONLY+O_BINARY);
+//    int fd = open(filename, O_RDONLY+O_BINARY);
+    int fd = toku_os_open(filename, O_RDONLY+O_BINARY, S_IRUSR, tokudb_file_log_key);
     if (fd<0) {
         int er = get_error_errno();
         if (logger->write_log_files) printf("couldn't open: %s\n", strerror(er));
@@ -1314,7 +1324,9 @@ static int peek_at_log (TOKULOGGER logger, char* filename, LSN *first_lsn) {
         lsn = rbuf_ulonglong(&rb);
     }
 
-    r=close(fd);
+    //r=close(fd);
+    r = toku_os_close(fd);
+    
     if (r!=0) { return 0; }
 
     first_lsn->lsn=lsn;

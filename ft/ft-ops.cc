@@ -338,6 +338,18 @@ extern pfs_key_t tp_internal_thread_key;
 
 //extern pfs_key_t fmutex_cond_key;   
 
+extern pfs_key_t tokudb_file_data_key;
+extern pfs_key_t tokudb_file_log_key;
+extern pfs_key_t tokudb_file_tmp_key;
+extern pfs_key_t tokudb_file_load_key;
+
+static PSI_file_info    all_ftindex_files[] = {
+        {&tokudb_file_data_key, "tokudb_data_file", 0},
+        {&tokudb_file_log_key,  "tokudb_log_file", 0},        
+        {&tokudb_file_tmp_key,  "tokudb_tmp_file", 0},       
+        {&tokudb_file_load_key, "tokudb_load_file", 0}
+};
+
 static PSI_thread_info  all_ftindex_threads[] = {
         {&extractor_thread_key, "extractor_thread", 0},
         {&fractal_thread_key, "fractal_thread", 0},
@@ -2967,9 +2979,9 @@ void toku_ft_set_direct_io (bool direct_io_on) {
 
 static inline int ft_open_maybe_direct(const char *filename, int oflag, int mode) {
     if (use_direct_io) {
-        return toku_os_open_direct(filename, oflag, mode);
+        return toku_os_open_direct(filename, oflag, mode, tokudb_file_data_key);
     } else {
-        return toku_os_open(filename, oflag, mode);
+        return toku_os_open(filename, oflag, mode, tokudb_file_data_key);
     }
 }
 
@@ -4747,6 +4759,10 @@ int toku_ft_layer_init(void) {
 
     count = array_elements(all_ftindex_threads);
     mysql_thread_register("fti", all_ftindex_threads, count);
+
+    count = array_elements(all_ftindex_files);
+    mysql_file_register("fti", all_ftindex_files, count);
+
 #endif
 
 #ifdef HAVE_PSI_MUTEX_INTERFACE
