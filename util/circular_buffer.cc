@@ -89,6 +89,10 @@ PATENT RIGHTS GRANT:
 #ident "Copyright (c) 2007-2013 Tokutek Inc.  All rights reserved."
 #ident "The technology is licensed by the Massachusetts Institute of Technology, Rutgers State University of New Jersey, and the Research Foundation of State University of New York at Stony Brook under United States of America Serial No. 11/760379 and to the patents and/or patent applications resulting from it."
 
+extern pfs_key_t circular_buffer_m_lock_mutex_key;
+extern pfs_key_t circular_buffer_m_push_cond_key;
+extern pfs_key_t circular_buffer_m_pop_cond_key;
+
 namespace toku {
 
     template<typename T>
@@ -98,9 +102,9 @@ namespace toku {
         m_cap = cap;
         m_begin = 0;
         m_limit = 0;
-        toku_mutex_init(&m_lock, nullptr);
-        toku_cond_init(&m_push_cond, nullptr);
-        toku_cond_init(&m_pop_cond, nullptr);
+        toku_mutex_init(circular_buffer_m_lock_mutex_key, &m_lock, nullptr);
+        toku_cond_init(circular_buffer_m_push_cond_key,&m_push_cond, nullptr);
+        toku_cond_init(circular_buffer_m_pop_cond_key,&m_pop_cond, nullptr);
         m_push_waiters = 0;
         m_pop_waiters = 0;
     }

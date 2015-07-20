@@ -184,7 +184,7 @@ static bool locks_are_expensive(void) {
 }
 
 static void test_write_cheapness(void) {
-    toku_mutex_init(&mutex, NULL);    
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&mutex, NULL);    
     w.init(&mutex);
 
     // single expensive write lock

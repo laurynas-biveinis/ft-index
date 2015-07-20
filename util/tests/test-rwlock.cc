@@ -301,7 +301,7 @@ void time_util_rwlock (void) __attribute((__noinline__));
 void time_util_rwlock (void) {
     struct rwlock rwlock;
     toku_mutex_t external_mutex;
-    toku_mutex_init(&external_mutex, NULL);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&external_mutex, NULL);
     rwlock_init(&rwlock);
     struct timeval start,end;
     
@@ -328,7 +328,7 @@ void time_util_prelocked_rwlock (void) __attribute__((__noinline__));
 void time_util_prelocked_rwlock (void) {
     struct rwlock rwlock;
     toku_mutex_t external_mutex;
-    toku_mutex_init(&external_mutex, NULL);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&external_mutex, NULL);
     toku_mutex_lock(&external_mutex);
     rwlock_init(&rwlock);
     struct timeval start,end;
@@ -355,7 +355,7 @@ void time_util_prelocked_rwlock (void) {
 void time_frwlock_prelocked(void) __attribute__((__noinline__));
 void time_frwlock_prelocked(void) {
     toku_mutex_t external_mutex;
-    toku_mutex_init(&external_mutex, NULL);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&external_mutex, NULL);
     struct timeval start,end;
     toku::frwlock x;
     x.init(&external_mutex);
@@ -392,7 +392,7 @@ void time_frwlock_prelocked(void) {
 void time_frwlock(void) __attribute__((__noinline__));
 void time_frwlock(void) {
     toku_mutex_t external_mutex;
-    toku_mutex_init(&external_mutex, NULL);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&external_mutex, NULL);
     struct timeval start,end;
     toku::frwlock x;
     x.init(&external_mutex);

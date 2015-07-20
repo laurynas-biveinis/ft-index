@@ -94,6 +94,8 @@ PATENT RIGHTS GRANT:
 #include <util/context.h>
 #include <util/frwlock.h>
 
+pfs_key_t frwlock_m_wait_read_key;
+
 namespace toku {
 
 static __thread int thread_local_tid = -1;
@@ -104,7 +106,12 @@ static int get_local_tid() {
     return thread_local_tid;
 }
 
-void frwlock::init(toku_mutex_t *const mutex) {
+void frwlock::init(
+ toku_mutex_t *const mutex
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+ ,PSI_rwlock_key psi_key
+#endif
+  ) {
     m_mutex = mutex;
 
     m_num_readers = 0;
@@ -114,7 +121,11 @@ void frwlock::init(toku_mutex_t *const mutex) {
     m_num_signaled_readers = 0;
     m_num_expensive_want_write = 0;
     
-    toku_cond_init(&m_wait_read, nullptr);
+    #if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+      toku_pthread_rwlock_init(psi_key, &m_rwlock, NULL);                                                
+    #endif
+//    toku_cond_init(frwlock_m_wait_read_key, &m_wait_read, nullptr);
+    nonpfs_toku_cond_init(frwlock_m_wait_read_key, &m_wait_read, nullptr);
     m_queue_item_read.cond = &m_wait_read;
     m_queue_item_read.next = nullptr;
     m_wait_read_is_in_queue = false;
@@ -128,7 +139,10 @@ void frwlock::init(toku_mutex_t *const mutex) {
 }
 
 void frwlock::deinit(void) {
-    toku_cond_destroy(&m_wait_read);
+    nonpfs_toku_cond_destroy(&m_wait_read);
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    toku_pthread_rwlock_destroy(&m_rwlock);
+#endif
 }
 
 bool frwlock::queue_is_empty(void) const {
@@ -159,8 +173,26 @@ toku_cond_t *frwlock::deq_item(void) {
 
 // Prerequisite: Holds m_mutex.
 void frwlock::write_lock(bool expensive) {
+
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    PSI_rwlock_locker *locker=NULL; 
+    PSI_rwlock_locker_state state;
+
+    if (m_rwlock.psi_rwlock != NULL)
+    {
+      /* Instrumentation start */
+      locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, m_rwlock.psi_rwlock,
+                                              PSI_RWLOCK_WRITELOCK, __FILE__, __LINE__);
+    }
+#endif
+
     toku_mutex_assert_locked(m_mutex);
     if (this->try_write_lock(expensive)) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    /* Instrumentation end */
+    if (m_rwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+#endif
         return;
     }
 
@@ -180,8 +212,8 @@ void frwlock::write_lock(bool expensive) {
         m_current_writer_tid = get_local_tid();
         m_blocking_writer_context_id = toku_thread_get_context()->get_id();
     }
-    toku_cond_wait(&cond, m_mutex);
-    toku_cond_destroy(&cond);
+    nonpfs_toku_cond_wait(&cond, m_mutex);
+    nonpfs_toku_cond_destroy(&cond);
 
     // Now it's our turn.
     paranoid_invariant(m_num_want_write > 0);
@@ -198,6 +230,13 @@ void frwlock::write_lock(bool expensive) {
     m_current_writer_expensive = expensive;
     m_current_writer_tid = get_local_tid();
     m_blocking_writer_context_id = toku_thread_get_context()->get_id();
+
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    /* Instrumentation end */
+    if (m_rwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+#endif
+
 }
 
 bool frwlock::try_write_lock(bool expensive) {
@@ -216,6 +255,17 @@ bool frwlock::try_write_lock(bool expensive) {
 }
 
 void frwlock::read_lock(void) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    PSI_rwlock_locker *locker=NULL; 
+    PSI_rwlock_locker_state state;
+
+    if (m_rwlock.psi_rwlock != NULL)
+    {
+      /* Instrumentation start */
+      locker= PSI_RWLOCK_CALL(start_rwlock_rdwait)(&state, m_rwlock.psi_rwlock,
+                                              PSI_RWLOCK_READLOCK, __FILE__, __LINE__);
+    }
+#endif
     toku_mutex_assert_locked(m_mutex);
     if (m_num_writers > 0 || m_num_want_write > 0) {
         if (!m_wait_read_is_in_queue) {
@@ -239,7 +289,7 @@ void frwlock::read_lock(void) {
 
         // Wait for our turn.
         ++m_num_want_read;
-        toku_cond_wait(&m_wait_read, m_mutex);
+        nonpfs_toku_cond_wait(&m_wait_read, m_mutex);
 
         // Now it's our turn.
         paranoid_invariant_zero(m_num_writers);
@@ -251,6 +301,12 @@ void frwlock::read_lock(void) {
         --m_num_signaled_readers;
     }
     ++m_num_readers;
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    /* Instrumentation end */
+    if (m_rwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_rdwait)(locker, 0);
+#endif
+
 }
 
 bool frwlock::try_read_lock(void) {
@@ -271,11 +327,15 @@ void frwlock::maybe_signal_next_writer(void) {
         paranoid_invariant(cond != &m_wait_read);
         // Grant write lock to waiting writer.
         paranoid_invariant(m_num_want_write > 0);
-        toku_cond_signal(cond);
+        nonpfs_toku_cond_signal(cond);
     }
 }
 
 void frwlock::read_unlock(void) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+  if (m_rwlock.psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(m_rwlock.psi_rwlock);
+#endif
     toku_mutex_assert_locked(m_mutex);
     paranoid_invariant(m_num_writers == 0);
     paranoid_invariant(m_num_readers > 0);
@@ -310,16 +370,20 @@ void frwlock::maybe_signal_or_broadcast_next(void) {
         m_num_signaled_readers = m_num_want_read;
         m_wait_read_is_in_queue = false;
         m_read_wait_expensive = false;
-        toku_cond_broadcast(cond);
+        nonpfs_toku_cond_broadcast(cond);
     }
     else {
         // Grant write lock to waiting writer.
         paranoid_invariant(m_num_want_write > 0);
-        toku_cond_signal(cond);
+        nonpfs_toku_cond_signal(cond);
     }
 }
 
 void frwlock::write_unlock(void) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+  if (m_rwlock.psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(m_rwlock.psi_rwlock);
+#endif
     toku_mutex_assert_locked(m_mutex);
     paranoid_invariant(m_num_writers == 1);
     m_num_writers = 0;

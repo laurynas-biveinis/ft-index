@@ -101,6 +101,10 @@ PATENT RIGHTS GRANT:
 #include "loader/dbufio.h"
 #include "loader/loader-internal.h"
 
+pfs_key_t bfs_mutex_key;
+pfs_key_t bfs_cond_key;
+pfs_key_t io_thread_key;
+
 struct dbufio_file {
     // i/o thread owns these
     int fd;
@@ -331,14 +335,14 @@ static void* io_thread (void *v)
 
 	if (paniced(bfs)) {
 	    toku_mutex_unlock(&bfs->mutex); // ignore any error
-	    return 0;
+	    return toku_pthread_done(0);
 	}
 	//printf("n_not_done=%d\n", bfs->n_not_done);
 	if (bfs->n_not_done==0) {
 	    // all done (meaning we stored EOF (or another error) in error_code[0] for the file.
 	    //printf("unlocked\n");
 	    toku_mutex_unlock(&bfs->mutex);
-	    return 0;
+	    return toku_pthread_done(0);
 	}
 
 	struct dbufio_file *dbf = bfs->head;
@@ -348,7 +352,7 @@ static void* io_thread (void *v)
 	    toku_cond_wait(&bfs->cond, &bfs->mutex);
 	    if (paniced(bfs)) {
 		toku_mutex_unlock(&bfs->mutex); // ignore any error
-		return 0;
+		return toku_pthread_done(0);
 	    }
 	    // Have the lock so go around.
 	} else {
@@ -394,7 +398,7 @@ static void* io_thread (void *v)
 		    toku_mutex_lock(&bfs->mutex);
 		    if (paniced(bfs)) {
                         toku_mutex_unlock(&bfs->mutex); // ignore any error
-                        return 0;
+                        return toku_pthread_done(0);
                     }
 		}
 		// Now that we have the mutex, we can decrement n_not_done (if applicable) and set second_buf_ready
@@ -431,11 +435,11 @@ int create_dbufio_fileset (DBUFIO_FILESET *bfsp, int N, int fds[/*N*/], size_t b
     }
     //printf("%s:%d here\n", __FILE__, __LINE__);
     if (result==0) {
-	toku_mutex_init(&bfs->mutex, NULL);
+	toku_mutex_init(bfs_mutex_key, &bfs->mutex, NULL);
 	mutex_inited = true;
     }
     if (result==0) {
-	toku_cond_init(&bfs->cond, NULL);
+	toku_cond_init(bfs_cond_key,&bfs->cond, NULL);
 	cond_inited = true;
     }
     if (result==0) {
@@ -485,7 +489,7 @@ int create_dbufio_fileset (DBUFIO_FILESET *bfsp, int N, int fds[/*N*/], size_t b
     }
     //printf("Creating IO thread\n");
     if (result==0) {
-	result = toku_pthread_create(&bfs->iothread, NULL, io_thread, (void*)bfs);
+	result = toku_pthread_create(io_thread_key, &bfs->iothread, NULL, io_thread, (void*)bfs);
     }
     if (result==0) { *bfsp = bfs; return 0; }
     // Now undo everything.

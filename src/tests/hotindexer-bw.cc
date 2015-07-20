@@ -398,7 +398,7 @@ static void test_indexer(DB *src, DB **dbs)
 static void run_test(void) 
 {
     int r;
-    toku_mutex_init(&put_lock, NULL);
+    toku_mutex_init(PFS_NOT_INSTRUMENTED,&put_lock, NULL);
     toku_os_recursive_delete(TOKU_TEST_FILENAME);
     r = toku_os_mkdir(TOKU_TEST_FILENAME, S_IRWXU+S_IRWXG+S_IRWXO);                          CKERR(r);
     char logname[TOKU_PATH_MAX+1];

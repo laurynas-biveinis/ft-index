@@ -92,6 +92,7 @@ PATENT RIGHTS GRANT:
 #ident "Copyright (c) 2007-2013 Tokutek Inc.  All rights reserved."
 #ident "The technology is licensed by the Massachusetts Institute of Technology, Rutgers State University of New Jersey, and the Research Foundation of State University of New York at Stony Brook under United States of America Serial No. 11/760379 and to the patents and/or patent applications resulting from it."
 
+#include "toku_portability.h"
 #include "ft/txn/txn.h"
 #include "ft/cachetable/cachetable.h"
 #include "ft/comparator.h"
@@ -133,6 +134,7 @@ int toku_ft_loader_abort(FTLOADER bl,
 // For test purposes only
 void toku_ft_loader_set_size_factor (uint32_t factor);
 
-void ft_loader_set_os_fwrite (size_t (*fwrite_fun)(const void*,size_t,size_t,FILE*));
+//void ft_loader_set_os_fwrite (size_t (*fwrite_fun)(const void*,size_t,size_t,TOKU_FILE*));
+#define ft_loader_set_os_fwrite(F) toku_set_func_fwrite(F)
 
 size_t ft_loader_leafentry_size(size_t key_size, size_t val_size, TXNID xid);

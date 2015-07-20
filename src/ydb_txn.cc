@@ -104,6 +104,8 @@ PATENT RIGHTS GRANT:
 #include "ydb_txn.h"
 #include "ydb_row_lock.h"
 
+pfs_key_t db_txn_struct_i_txn_mutex_key;
+
 static uint64_t toku_txn_id64(DB_TXN * txn) {
     HANDLE_PANICKED_ENV(txn->mgrp);
     return toku_txn_get_root_id(db_txn_struct_i(txn)->tokutxn);
@@ -594,7 +596,7 @@ int toku_txn_begin(DB_ENV *env, DB_TXN * stxn, DB_TXN ** txn, uint32_t flags) {
     db_txn_struct_i(result)->iso = child_isolation;
     db_txn_struct_i(result)->lt_map.create_no_array();
 
-    toku_mutex_init(&db_txn_struct_i(result)->txn_mutex, NULL);
+    toku_mutex_init(db_txn_struct_i_txn_mutex_key, &db_txn_struct_i(result)->txn_mutex, NULL);
 
     TXN_SNAPSHOT_TYPE snapshot_type;
     switch(db_txn_struct_i(result)->iso){
@@ -657,7 +659,7 @@ void toku_keep_prepared_txn_callback (DB_ENV *env, TOKUTXN tokutxn) {
 
     toku_txn_set_container_db_txn(tokutxn, result);
 
-    toku_mutex_init(&db_txn_struct_i(result)->txn_mutex, NULL);
+    toku_mutex_init(db_txn_struct_i_txn_mutex_key, &db_txn_struct_i(result)->txn_mutex, NULL);
 }
 
 // Test-only function

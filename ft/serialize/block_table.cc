@@ -108,6 +108,11 @@ PATENT RIGHTS GRANT:
 #include "util/nb_mutex.h"
 #include "util/scoped_malloc.h"
 
+
+pfs_key_t block_table_mutex_key;
+pfs_key_t safe_file_size_lock_mutex_key;
+pfs_key_t safe_file_size_lock_rwlock_key;
+
 // indicates the end of a freelist
 static const BLOCKNUM freelist_null = { -1 };
 
@@ -152,8 +157,8 @@ void block_table::_create_internal() {
     memset(&_inprogress, 0, sizeof(struct translation));
     memset(&_checkpointed, 0, sizeof(struct translation));
     memset(&_mutex, 0, sizeof(_mutex));
-    toku_mutex_init(&_mutex, nullptr);
-    nb_mutex_init(&_safe_file_size_lock);
+    toku_mutex_init(block_table_mutex_key, &_mutex, nullptr);
+    nb_mutex_init(safe_file_size_lock_mutex_key, safe_file_size_lock_rwlock_key, &_safe_file_size_lock);
 }
 
 // Fill in the checkpointed translation from buffer, and copy checkpointed to current.

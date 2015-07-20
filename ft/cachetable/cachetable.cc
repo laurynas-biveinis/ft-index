@@ -110,6 +110,25 @@ PATENT RIGHTS GRANT:
 #include "util/status.h"
 #include "util/context.h"
 
+pfs_key_t cachetable_m_mutex_key;
+pfs_key_t cachetable_ev_thread_lock_mutex_key;
+
+pfs_key_t cachetable_m_list_lock_key;   
+pfs_key_t cachetable_m_pending_lock_expensive_key;
+pfs_key_t cachetable_m_pending_lock_cheap_key;
+pfs_key_t cachetable_m_lock_key;
+
+pfs_key_t cachetable_value_key;
+pfs_key_t cachetable_disk_nb_mutex_key;
+pfs_key_t cachetable_disk_nb_rwlock_key;
+
+pfs_key_t cachetable_p_refcount_wait_key;
+pfs_key_t cachetable_m_flow_control_cond_key;
+pfs_key_t cachetable_m_ev_thread_cond_key;
+
+pfs_key_t log_internal_lock_mutex_key;
+pfs_key_t eviction_thread_key;
+
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
 //
@@ -828,13 +847,17 @@ void pair_init(PAIR p,
     p->count = 0; // <CER> Is zero the correct init value?
     p->refcount = 0;
     p->num_waiting_on_refs = 0;
-    toku_cond_init(&p->refcount_wait, NULL);
+    toku_cond_init(cachetable_p_refcount_wait_key,&p->refcount_wait, NULL);
     p->checkpoint_pending = false;
 
     p->mutex = list->get_mutex_for_pair(fullhash);
     assert(p->mutex);
-    p->value_rwlock.init(p->mutex);
-    nb_mutex_init(&p->disk_nb_mutex);
+    p->value_rwlock.init(p->mutex
+ #if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+    , cachetable_value_key
+ #endif
+    );
+    nb_mutex_init(cachetable_disk_nb_mutex_key, cachetable_disk_nb_rwlock_key, &p->disk_nb_mutex);
 
     p->size_evicting_estimate = 0; // <CER> Is zero the correct init value?
 
@@ -3262,13 +3285,17 @@ void pair_list::init() {
     // TODO: need to figure out how to make writer-preferential rwlocks
     // happen on osx
 #endif
-    toku_pthread_rwlock_init(&m_list_lock, &attr);
-    toku_pthread_rwlock_init(&m_pending_lock_expensive, &attr);    
-    toku_pthread_rwlock_init(&m_pending_lock_cheap, &attr);    
+    toku_pthread_rwlock_init(cachetable_m_list_lock_key, &m_list_lock, &attr);
+    toku_pthread_rwlock_init(cachetable_m_pending_lock_expensive_key, &m_pending_lock_expensive, &attr);    
+    toku_pthread_rwlock_init(cachetable_m_pending_lock_cheap_key, &m_pending_lock_cheap, &attr);    
     XCALLOC_N(m_table_size, m_table);
     XCALLOC_N(m_num_locks, m_mutexes);
     for (uint64_t i = 0; i < m_num_locks; i++) {
-        toku_mutex_init(&m_mutexes[i].aligned_mutex, NULL);
+#ifdef TOKU_PFS_MUTEX_EXTENDED_CACHETABLEMMUTEX
+        toku_mutex_init(cachetable_m_mutex_key, &m_mutexes[i].aligned_mutex, NULL);
+#else
+        toku_mutex_init(PFS_NOT_INSTRUMENTED, &m_mutexes[i].aligned_mutex, NULL);
+#endif
     }
 }
 
@@ -3610,7 +3637,7 @@ ENSURE_POD(evictor);
 static void *eviction_thread(void *evictor_v) {
     evictor* CAST_FROM_VOIDP(evictor, evictor_v);
     evictor->run_eviction_thread();
-    return evictor_v;
+    return toku_pthread_done(evictor_v);
 }
 
 //
@@ -3658,9 +3685,9 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_pl = _pl;
     m_cf_list = _cf_list;
     m_kibbutz = _kibbutz;    
-    toku_mutex_init(&m_ev_thread_lock, NULL);
-    toku_cond_init(&m_flow_control_cond, NULL);
-    toku_cond_init(&m_ev_thread_cond, NULL);
+    toku_mutex_init(cachetable_ev_thread_lock_mutex_key, &m_ev_thread_lock, NULL);
+    toku_cond_init(cachetable_m_flow_control_cond_key,&m_flow_control_cond, NULL);
+    toku_cond_init(cachetable_m_ev_thread_cond_key,&m_ev_thread_cond, NULL);
     m_num_sleepers = 0;    
     m_ev_thread_is_running = false;
     m_period_in_seconds = eviction_period;
@@ -3673,7 +3700,7 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_run_thread = true;
     m_num_eviction_thread_runs = 0;
     m_ev_thread_init = false;
-    r = toku_pthread_create(&m_ev_thread, NULL, eviction_thread, this); 
+    r = toku_pthread_create(eviction_thread_key, &m_ev_thread, NULL, eviction_thread, this); 
     if (r == 0) {
         m_ev_thread_init = true;
     }
@@ -4721,7 +4748,7 @@ static_assert(std::is_pod<cachefile_list>::value, "cachefile_list isn't POD");
 void cachefile_list::init() {
     m_next_filenum_to_use.fileid = 0;
     m_next_hash_id_to_use = 0;
-    toku_pthread_rwlock_init(&m_lock, NULL);
+    toku_pthread_rwlock_init(cachetable_m_lock_key, &m_lock, NULL);
     m_active_filenum.create();
     m_active_fileid.create();
     m_stale_fileid.create();

@@ -104,12 +104,18 @@ PATENT RIGHTS GRANT:
 #include "toku_path.h"
 #include <portability/toku_atomic.h>
 
+
+#include <toku_pfs.h>
+pfs_key_t tokudb_file_data_key;
+
+
 static int toku_assert_on_write_enospc = 0;
 static const int toku_write_enospc_sleep = 1;
 static uint64_t toku_write_enospc_last_report;      // timestamp of most recent report to error log
 static time_t   toku_write_enospc_last_time;        // timestamp of most recent ENOSPC
 static uint32_t toku_write_enospc_current;          // number of threads currently blocked on ENOSPC
 static uint64_t toku_write_enospc_total;            // total number of times ENOSPC was returned from an attempt to write
+
 
 void toku_set_assert_on_write_enospc(int do_assert) {
     toku_assert_on_write_enospc = do_assert;
@@ -197,6 +203,11 @@ static int     (*t_open)(const char *, int, int);
 static int     (*t_fclose)(FILE *);
 static ssize_t (*t_read)(int, void *, size_t);
 static ssize_t (*t_pread)(int, void *, size_t, off_t);
+static size_t (*os_fwrite_fun)(const void *,size_t,size_t, FILE*)=NULL;
+
+void toku_set_func_fwrite (size_t (*fwrite_fun)(const void*,size_t,size_t, FILE*)) {
+    os_fwrite_fun=fwrite_fun;
+}
 
 void toku_set_func_write (ssize_t (*write_fun)(int, const void *, size_t)) {
     t_write = write_fun;
@@ -238,9 +249,49 @@ void toku_set_func_pread (ssize_t (*pread_fun)(int, void *, size_t, off_t)) {
     t_pread = pread_fun;
 }
 
+
+
+static inline int
+inline_toku_os_delete(const char *name
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+)
+{
+    int result;
+#ifdef HAVE_PSI_FILE_INTERFACE   
+    struct PSI_file_locker *locker;
+    PSI_file_locker_state state;
+    register_pfs_file_name_close_begin(&state, locker, tokudb_file_data_key,
+                                       PSI_FILE_DELETE, name, src_file, src_line);
+#endif
+    result= unlink(name);
+
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* Regsiter the returning "r" value with the system */
+    register_pfs_file_close_end(locker, result);
+#endif
+    return result;
+}
+
 void
-toku_os_full_write (int fd, const void *buf, size_t len) {
+inline_toku_os_full_write(int fd, const void *buf, size_t len
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+)
+ {
     const char *bp = (const char *) buf;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    size_t bytes_written= len;
+    //fprintf(stderr,"inline_toku_os_full_write1: %ld: len: %ld fd: %d\n",bytes_written,len, fd);
+    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
+                               src_file, src_line);
+//    if (locker)
+//     fprintf(stderr,"inline_toku_os_full_write1.5: LOCKER OK\n");
+#endif
     while (len > 0) {
         ssize_t r;
         if (t_full_write) {
@@ -257,14 +308,29 @@ toku_os_full_write (int fd, const void *buf, size_t len) {
         }
     }
     assert(len == 0);
+#ifdef HAVE_PSI_FILE_INTERFACE
+//    fprintf(stderr,"inline_toku_os_full_write2: %ld: len: %ld\n",bytes_written,len);
+    register_pfs_file_io_end(locker,  bytes_written);
+#endif
 }
 
 int
-toku_os_write (int fd, const void *buf, size_t len) {
+inline_toku_os_write(int fd, const void *buf, size_t len
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     const char *bp = (const char *) buf;
     int result = 0;
+    ssize_t r;    
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    size_t bytes_written= len;
+    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
+                               src_file, src_line);
+#endif
     while (len > 0) {
-        ssize_t r;
         if (t_write) {
             r = t_write(fd, bp, len);
         } else {
@@ -277,14 +343,34 @@ toku_os_write (int fd, const void *buf, size_t len) {
         len           -= r;
         bp            += r;
     }
+#ifdef HAVE_PSI_FILE_INTERFACE
+//    fprintf(stderr,"inline_toku_os_write: %ld",bytes_written);
+    register_pfs_file_io_end(locker, (len == 0) ? bytes_written : bytes_written-len);
+#endif
     return result;
 }
 
 void
-toku_os_full_pwrite (int fd, const void *buf, size_t len, toku_off_t off) {
+inline_toku_os_full_pwrite(int fd, const void *buf, size_t len, toku_off_t off
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     assert(0==((long long)buf)%512);
     assert((len%512 == 0) && (off%512)==0); // to make pwrite work.
     const char *bp = (const char *) buf;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    size_t bytes_written= len;
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+//    fprintf(stderr,"inline_toku_os_full_pwrite: %ld: len: %ld, fd: %d\n",bytes_written,len,fd);
+
+    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
+                               src_file, src_line);
+//    if (locker)
+//     fprintf(stderr,"inline_toku_os_full_pwrite1.5: LOCKER OK\n");
+
+#endif
     while (len > 0) {
         ssize_t r;
         if (t_full_pwrite) {
@@ -302,17 +388,37 @@ toku_os_full_pwrite (int fd, const void *buf, size_t len, toku_off_t off) {
         }
     }
     assert(len == 0);
+#ifdef HAVE_PSI_FILE_INTERFACE
+//    fprintf(stderr,"inline_toku_os_full_pwrite: %ld, len: %ld\n",bytes_written, len);
+    register_pfs_file_io_end(locker, bytes_written);
+#endif
+
 }
 
 ssize_t
-toku_os_pwrite (int fd, const void *buf, size_t len, toku_off_t off) {
+inline_toku_os_pwrite (int fd, const void *buf, size_t len, toku_off_t off
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     assert(0==((long long)buf)%512); // these asserts are to ensure that direct I/O will work.
     assert(0==len             %512);
     assert(0==off             %512);
     const char *bp = (const char *) buf;
     ssize_t result = 0;
+    ssize_t r;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    size_t bytes_written= len;
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+//    fprintf(stderr,"inline_toku_os_pwrite1: %ld: len: %ld, fd: %d\n",bytes_written,len,fd);
+    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
+                               src_file, src_line);
+//    if (locker)
+//     fprintf(stderr,"inline_toku_os_pwrite1.5: LOCKER OK\n");
+
+#endif
     while (len > 0) {
-        ssize_t r;
         if (t_pwrite) {
             r = t_pwrite(fd, bp, len, off);
         } else {
@@ -326,47 +432,172 @@ toku_os_pwrite (int fd, const void *buf, size_t len, toku_off_t off) {
         bp            += r;
         off           += r;
     }
+#ifdef HAVE_PSI_FILE_INTERFACE
+//    fprintf(stderr,"inline_toku_os_pwrite: %ld, len: %ld\n",bytes_written, len);
+    register_pfs_file_io_end(locker, (len == 0) ? bytes_written : bytes_written-len);
+#endif
     return result;
 }
 
-FILE * 
-toku_os_fdopen(int fildes, const char *mode) {
-    FILE * rval;
-    if (t_fdopen)
-	rval = t_fdopen(fildes, mode);
-    else 
-	rval = fdopen(fildes, mode);
+int
+inline_toku_os_fwrite (const void *ptr, size_t size, size_t nmemb, TOKU_FILE *stream
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
+    int result = 0;
+    size_t written;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_stream_io_begin(&state, locker, stream->psi_key, nmemb, 
+                                      PSI_FILE_WRITE, src_file, src_line);
+#endif
+    if (os_fwrite_fun) {
+        written= os_fwrite_fun(ptr, size, nmemb, stream->file);
+    } else {
+        written= fwrite(ptr, size, nmemb, stream->file);
+    }
+
+    if (written != nmemb) {
+        if (os_fwrite_fun)    // if using hook to induce artificial errors (for testing) ...
+          result= get_maybe_error_errno();        // ... then there is no error in the stream, but there is one in errno
+        else
+          result= ferror(stream->file);
+    }
+    invariant(result != 0);
+    
+#ifdef HAVE_PSI_FILE_INTERFACE
+//    fprintf(stderr,"inline_toku_os_fwrite: %ld",written);
+    register_pfs_file_io_end(locker, written);
+#endif
+    return result;
+}
+
+
+int
+inline_toku_os_fread(void *ptr, size_t size, size_t nmemb, TOKU_FILE *stream
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
+    int result = 0;
+    size_t bytes_read;
+#ifdef HAVE_PSI_FILE_INTERFACE2
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_stream_io_begin(&state, locker, stream->psi_key, nmemb, 
+                                      PSI_FILE_READ, src_file, src_line);
+#endif
+    if ((bytes_read= fread(ptr, size, nmemb, stream->file)) != nmemb) {
+        if ((feof(stream->file))) 
+          result= EOF;
+        else
+          result= ferror(stream->file);
+    }  
+#ifdef HAVE_PSI_FILE_INTERFACE2
+    register_pfs_file_io_end(locker, (result == 0) ? bytes_read : 0);
+#endif
+    return result;
+}
+
+
+
+TOKU_FILE * 
+inline_toku_os_fdopen(int fildes, const char *mode
+) {
+    //TOKU_FILE * rval;
+    TOKU_FILE *XMALLOC(rval);
+    if (toku_likely(rval != NULL))
+    {
+      if (t_fdopen)
+	rval->file = t_fdopen(fildes, mode);
+      else 
+	rval->file = fdopen(fildes, mode);
+      if (toku_unlikely(rval->file == NULL))
+      {
+        toku_free(rval);
+        rval=NULL;
+      }
+    }
     return rval;
 }
     
 
-FILE *
-toku_os_fopen(const char *filename, const char *mode){
-    FILE * rval;
+TOKU_FILE *
+inline_toku_os_fopen(const char *filename, const char *mode
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , pfs_key_t psi_key, const char *src_file, uint src_line
+#endif
+){
+    //TOKU_FILE * rval;
+    TOKU_FILE *XMALLOC(rval);
+    if (toku_likely(rval != NULL))
+    {
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* register a file stream open  */
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_open_begin(&state, locker, psi_key, PSI_FILE_STREAM_OPEN, 
+                               filename, src_file, src_line);
+#endif
     if (t_fopen)
-	rval = t_fopen(filename, mode);
+	rval->file = t_fopen(filename, mode);
     else
-	rval = fopen(filename, mode);
+	rval->file = fopen(filename, mode);
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* Regsiter the returning "file" value with the system */
+    register_pfs_file_stream_open_end(locker, rval->file, rval->psi_key);
+#endif
+    if (toku_unlikely(rval->file == NULL))
+    {
+      toku_free(rval);
+      rval=NULL;
+    }
+    }      
     return rval;
 }
 
 int 
-toku_os_open(const char *path, int oflag, int mode) {
+inline_toku_os_open(const char *path, int oflag, int mode
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , pfs_key_t psi_key, const char *src_file, uint src_line
+#endif
+) {
     int rval;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* register a file open or creation depending on "oflag" */
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_open_begin(&state, locker, psi_key, 
+                                 ((oflag & O_CREAT)
+                                 ? PSI_FILE_CREATE
+                                 : PSI_FILE_OPEN),
+                               path, src_file, src_line);
+#endif
     if (t_open)
 	rval = t_open(path, oflag, mode);
     else
 	rval = open(path, oflag, mode);
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* Regsiter the returning "rval" value with the system */
+//    fprintf(stderr,"inline_toku_os_open: open fd: %d\n", rval);
+    register_pfs_file_open_end(locker, rval);
+#endif
     return rval;
 }
 
 int
-toku_os_open_direct(const char *path, int oflag, int mode) {
+toku_os_open_direct(const char *path, int oflag, int mode
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , pfs_key_t psi_key
+#endif
+) {
     int rval;
 #if defined(HAVE_O_DIRECT)
-    rval = toku_os_open(path, oflag | O_DIRECT, mode);
+    rval = toku_os_open(path, oflag | O_DIRECT, mode, psi_key);
 #elif defined(HAVE_F_NOCACHE)
-    rval = toku_os_open(path, oflag, mode);
+    rval = toku_os_open(path, oflag, mode, psi_key);
     if (rval >= 0) {
         int r = fcntl(rval, F_NOCACHE, 1);
         if (r == -1) {
@@ -379,24 +610,56 @@ toku_os_open_direct(const char *path, int oflag, int mode) {
     return rval;
 }
 
+
 int
-toku_os_fclose(FILE * stream) {  
+inline_toku_os_fclose(TOKU_FILE * stream
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {  
     int rval = -1;
+    if (toku_likely(stream != NULL))
+    {
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* register a file stream close " */
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_stream_close_begin(&state, locker, PSI_FILE_STREAM_CLOSE,
+                                         stream->psi_key, src_file, src_line);
+#endif
     if (t_fclose)
-	rval = t_fclose(stream);
+	rval = t_fclose(stream->file);
     else {                      // if EINTR, retry until success
 	while (rval != 0) {
-	    rval = fclose(stream);
+	    rval = fclose(stream->file);
 	    if (rval && (errno != EINTR))
 		break;
 	}
+    }
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* Regsiter the returning "rval" value with the system */
+    register_pfs_file_close_end(locker, rval);
+#endif
+    toku_free(stream->file);
     }
     return rval;
 }
 
 int 
-toku_os_close(int fd) {  // if EINTR, retry until success
+inline_toku_os_close(int fd
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {  // if EINTR, retry until success
+        /* register the file close */
     int r = -1;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* register a file stream close " */
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_fd_close_begin(&state, locker, PSI_FILE_CLOSE,
+                                     fd, src_file, src_line);
+#endif
     while (r != 0) {
 	r = close(fd);
 	if (r) {
@@ -405,30 +668,60 @@ toku_os_close(int fd) {  // if EINTR, retry until success
 	    assert(rr==EINTR);
 	}
     }
+#ifdef HAVE_PSI_FILE_INTERFACE
+    /* Regsiter the returning "r" value with the system */
+    register_pfs_file_close_end(locker, r);
+#endif
     return r;
 }
 
 ssize_t 
-toku_os_read(int fd, void *buf, size_t count) {
+inline_toku_os_read(int fd, void *buf, size_t count
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     ssize_t r;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_io_begin(&state, locker, fd, count, PSI_FILE_READ, 
+                               src_file, src_line);
+#endif
     if (t_read)
         r = t_read(fd, buf, count);
     else
         r = read(fd, buf, count);
+#ifdef HAVE_PSI_FILE_INTERFACE
+    register_pfs_file_io_end(locker, r);
+#endif
     return r;
 }
 
 ssize_t
-toku_os_pread (int fd, void *buf, size_t count, off_t offset) {
+inline_toku_os_pread (int fd, void *buf, size_t count, off_t offset
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     assert(0==((long long)buf)%512);
     assert(0==count%512);
     assert(0==offset%512);
     ssize_t r;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_io_begin(&state, locker, fd, count, PSI_FILE_READ, 
+                               src_file, src_line);
+#endif
     if (t_pread) {
 	r = t_pread(fd, buf, count, offset);
     } else {
 	r = pread(fd, buf, count, offset);
     }
+#ifdef HAVE_PSI_FILE_INTERFACE
+    register_pfs_file_io_end(locker, r);
+#endif
     return r;
 }
 
@@ -457,10 +750,20 @@ void toku_set_func_fsync(int (*fsync_function)(int)) {
 }
 
 // keep trying if fsync fails because of EINTR
-static void file_fsync_internal (int fd) {
+static void inline_file_fsync_internal (int fd
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     uint64_t tstart = toku_current_time_microsec();
     int r = -1;
     uint64_t eintr_count = 0;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;   
+    register_pfs_file_io_begin(&state, locker, fd, 0, PSI_FILE_SYNC, 
+                               src_file, src_line);
+#endif
     while (r != 0) {
 	if (t_fsync) {
 	    r = t_fsync(fd);
@@ -475,6 +778,9 @@ static void file_fsync_internal (int fd) {
     toku_sync_fetch_and_add(&toku_fsync_count, 1);
     uint64_t duration = toku_current_time_microsec() - tstart;
     toku_sync_fetch_and_add(&toku_fsync_time, duration);
+#ifdef HAVE_PSI_FILE_INTERFACE
+    register_pfs_file_io_end(locker, 0);
+#endif
     if (duration >= toku_long_fsync_threshold) {
         toku_sync_fetch_and_add(&toku_long_fsync_count, 1);
         toku_sync_fetch_and_add(&toku_long_fsync_time, duration);

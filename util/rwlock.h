@@ -200,8 +200,13 @@ PATENT RIGHTS GRANT:
 // increase parallelism at the expense of single thread performance, we
 // are experimenting with a single higher level lock.
 
-typedef struct rwlock *RWLOCK;
-struct rwlock {
+
+extern pfs_key_t rwlock_cond_key;
+extern pfs_key_t rwlock_wait_read_key;    
+extern pfs_key_t rwlock_wait_write_key;
+
+typedef struct st_rwlock *RWLOCK;
+struct st_rwlock {
     int reader;                  // the number of readers
     int want_read;                // the number of blocked readers
     toku_cond_t wait_read;
@@ -209,6 +214,10 @@ struct rwlock {
     int want_write;              // the number of blocked writers
     toku_cond_t wait_write;
     toku_cond_t* wait_users_go_to_zero;
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)    
+    toku_pthread_rwlock_t prwlock;
+#endif
+
 };
 
 // returns: the sum of the number of readers, pending readers, writers, and
@@ -218,15 +227,29 @@ static inline int rwlock_users(RWLOCK rwlock) {
     return rwlock->reader + rwlock->want_read + rwlock->writer + rwlock->want_write;
 }
 
-// initialize a read write lock
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    #define rwlock_init(K, R) \
+      inline_rwlock_init(K, R)
+#else
+    #define rwlock_init(K, R) \
+      inline_rwlock_init(R)
+#endif
 
+// initialize a read write lock
 static __attribute__((__unused__))
 void
-rwlock_init(RWLOCK rwlock) {
+inline_rwlock_init(
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+ PSI_rwlock_key psi_key,
+#endif
+ RWLOCK rwlock ) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    toku_pthread_rwlock_init(psi_key, &rwlock->prwlock, NULL);
+#endif
     rwlock->reader = rwlock->want_read = 0;
-    toku_cond_init(&rwlock->wait_read, 0);
+    nonpfs_toku_cond_init(rwlock_wait_read_key, &rwlock->wait_read, 0);
     rwlock->writer = rwlock->want_write = 0;
-    toku_cond_init(&rwlock->wait_write, 0);
+    nonpfs_toku_cond_init(rwlock_wait_write_key, &rwlock->wait_write, 0);
     rwlock->wait_users_go_to_zero = NULL;
 }
 
@@ -239,37 +262,61 @@ rwlock_destroy(RWLOCK rwlock) {
     paranoid_invariant(rwlock->want_read == 0);
     paranoid_invariant(rwlock->writer == 0);
     paranoid_invariant(rwlock->want_write == 0);
-    toku_cond_destroy(&rwlock->wait_read);
-    toku_cond_destroy(&rwlock->wait_write);
+    nonpfs_toku_cond_destroy(&rwlock->wait_read);
+    nonpfs_toku_cond_destroy(&rwlock->wait_write);
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    toku_pthread_rwlock_destroy(&rwlock->prwlock);
+#endif
 }
 
 // obtain a read lock
 // expects: mutex is locked
 
 static inline void rwlock_read_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    PSI_rwlock_locker *locker=NULL;
+    PSI_rwlock_locker_state state;
+
+    if (rwlock->prwlock.psi_rwlock != NULL)
+    {
+      /* Instrumentation start */
+      locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, rwlock->prwlock.psi_rwlock,
+                                              PSI_RWLOCK_READLOCK, __FILE__, __LINE__);
+    }
+#endif
+                                                                              
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     if (rwlock->writer || rwlock->want_write) {
         rwlock->want_read++;
         while (rwlock->writer || rwlock->want_write) {
-            toku_cond_wait(&rwlock->wait_read, mutex);
+            nonpfs_toku_cond_wait(&rwlock->wait_read, mutex);
         }
         rwlock->want_read--;
     }
     rwlock->reader++;
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    /* Instrumentation end */
+    if (rwlock->prwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+#endif
 }
 
 // release a read lock
 // expects: mutex is locked
 
 static inline void rwlock_read_unlock(RWLOCK rwlock) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH) 
+  if (rwlock->prwlock.psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->prwlock.psi_rwlock);
+#endif
     paranoid_invariant(rwlock->reader > 0);
     paranoid_invariant(rwlock->writer == 0);
     rwlock->reader--;
     if (rwlock->reader == 0 && rwlock->want_write) {
-        toku_cond_signal(&rwlock->wait_write);
+        nonpfs_toku_cond_signal(&rwlock->wait_write);
     }
     if (rwlock->wait_users_go_to_zero && rwlock_users(rwlock) == 0) {
-        toku_cond_signal(rwlock->wait_users_go_to_zero);
+        nonpfs_toku_cond_signal(rwlock->wait_users_go_to_zero);
     }
 }
 
@@ -277,31 +324,51 @@ static inline void rwlock_read_unlock(RWLOCK rwlock) {
 // expects: mutex is locked
 
 static inline void rwlock_write_lock(RWLOCK rwlock, toku_mutex_t *mutex) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    PSI_rwlock_locker *locker=NULL;
+    PSI_rwlock_locker_state state;
+
+    if (rwlock->prwlock.psi_rwlock != NULL)
+    {
+      /* Instrumentation start */
+      locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, rwlock->prwlock.psi_rwlock,
+                                              PSI_RWLOCK_WRITELOCK, __FILE__, __LINE__);
+    }
+#endif
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     if (rwlock->reader || rwlock->writer) {
         rwlock->want_write++;
         while (rwlock->reader || rwlock->writer) {
-            toku_cond_wait(&rwlock->wait_write, mutex);
+            nonpfs_toku_cond_wait(&rwlock->wait_write, mutex);
         }
         rwlock->want_write--;
     }
     rwlock->writer++;
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
+    /* Instrumentation end */
+    if (rwlock->prwlock.psi_rwlock != NULL && locker != NULL)
+      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, 0);
+#endif
 }
 
 // release a write lock
 // expects: mutex is locked
 
 static inline void rwlock_write_unlock(RWLOCK rwlock) {
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH) 
+  if (rwlock->prwlock.psi_rwlock != NULL)
+    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->prwlock.psi_rwlock);
+#endif
     paranoid_invariant(rwlock->reader == 0);
     paranoid_invariant(rwlock->writer == 1);
     rwlock->writer--;
     if (rwlock->want_write) {
-        toku_cond_signal(&rwlock->wait_write);
+        nonpfs_toku_cond_signal(&rwlock->wait_write);
     } else if (rwlock->want_read) {
-        toku_cond_broadcast(&rwlock->wait_read);
+        nonpfs_toku_cond_broadcast(&rwlock->wait_read);
     }    
     if (rwlock->wait_users_go_to_zero && rwlock_users(rwlock) == 0) {
-        toku_cond_signal(rwlock->wait_users_go_to_zero);
+        nonpfs_toku_cond_signal(rwlock->wait_users_go_to_zero);
     }
 }
 
@@ -344,12 +411,12 @@ static inline void rwlock_wait_for_users(
 {
     paranoid_invariant(!rwlock->wait_users_go_to_zero);
     toku_cond_t cond;
-    toku_cond_init(&cond, NULL);
+    nonpfs_toku_cond_init(rwlock_cond_key,&cond, NULL);
     while (rwlock_users(rwlock) > 0) {
         rwlock->wait_users_go_to_zero = &cond;
-        toku_cond_wait(&cond, mutex);
+        nonpfs_toku_cond_wait(&cond, mutex);
     }
     rwlock->wait_users_go_to_zero = NULL;
-    toku_cond_destroy(&cond);
+    nonpfs_toku_cond_destroy(&cond);
 }
 

@@ -104,7 +104,12 @@ namespace toku {
 class frwlock {
 public:
 
-    void init(toku_mutex_t *const mutex);
+    void init(
+              toku_mutex_t *const mutex
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+              ,PSI_rwlock_key psi_key
+#endif
+              );
     void deinit(void);
 
     void write_lock(bool expensive);
@@ -161,11 +166,13 @@ private:
     // new readers (either because this writer holds the write lock or
     // is the first to want the write lock).
     context_id m_blocking_writer_context_id;
-    
-    toku_cond_t m_wait_read;
     queue_item m_queue_item_read;
     bool m_wait_read_is_in_queue;
 
+    toku_cond_t m_wait_read;
+#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)    
+    toku_pthread_rwlock_t  m_rwlock;
+#endif
     queue_item *m_wait_head;
     queue_item *m_wait_tail;
 };

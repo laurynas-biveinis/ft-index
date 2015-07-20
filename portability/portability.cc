@@ -128,6 +128,9 @@ PATENT RIGHTS GRANT:
 #include "toku_os.h"
 #include "toku_time.h"
 #include "memory.h"
+
+#include "toku_pfs.h"
+
 #include <portability/toku_atomic.h>
 #include <util/partitioned_counter.h>
 
@@ -217,13 +220,27 @@ toku_os_get_phys_memory_size(void) {
 #endif
 }
 
+
 int
-toku_os_get_file_size(int fildes, int64_t *fsize) {
+inline_toku_os_get_file_size(int fildes, int64_t *fsize
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
     toku_struct_stat sbuf;
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;
+    register_pfs_file_io_begin(&state, locker, fildes, 0,
+                               PSI_FILE_FSTAT, src_file, src_line);
+#endif
     int r = fstat(fildes, &sbuf);
     if (r==0) {
         *fsize = sbuf.st_size;
     }
+#ifdef HAVE_PSI_FILE_INTERFACE
+    register_pfs_file_io_end(locker, 0);
+#endif
     return r;
 }
 
@@ -318,14 +335,40 @@ toku_os_get_max_process_data_size(uint64_t *maxdata) {
 }
 
 int
-toku_stat(const char *name, toku_struct_stat *buf) {
+inline_toku_os_stat(const char *name, toku_struct_stat *buf
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , pfs_key_t pfs_key, const char *src_file, uint src_line
+#endif
+) {
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;
+    register_pfs_file_name_io_begin(&state, locker, pfs_key, name, 0,
+                               PSI_FILE_STAT, src_file, src_line);
+#endif
     int r = stat(name, buf);
+#ifdef HAVE_PSI_FILE_INTERFACE
+    register_pfs_file_io_end(locker, 0);
+#endif
     return r;
 }
 
 int
-toku_fstat(int fd, toku_struct_stat *buf) {
+inline_toku_os_fstat(int fd, toku_struct_stat *buf
+#ifdef HAVE_PSI_FILE_INTERFACE
+  , const char *src_file, uint src_line
+#endif
+) {
+#ifdef HAVE_PSI_FILE_INTERFACE
+    struct PSI_file_locker *locker = NULL;
+    PSI_file_locker_state state;
+    register_pfs_file_io_begin(&state, locker, fd, 0,
+                               PSI_FILE_FSTAT, src_file, src_line);
+#endif
     int r = fstat(fd, buf);
+#ifdef HAVE_PSI_FILE_INTERFACE
+    register_pfs_file_io_end(locker, 0);
+#endif
     return r;
 }
 
