@@ -95,6 +95,7 @@ PATENT RIGHTS GRANT:
 #include <time.h>
 #include <stdint.h>
 
+#include "toku_portability.h"
 #include "toku_assert.h"
 
 #ifdef MYSQL_TOKUDB_ENGINE
@@ -120,7 +121,6 @@ typedef struct timespec toku_timespec_t;
 #  undef HAVE_PSI_RWLOCK_INTERFACE
 #  undef HAVE_PSI_COND_INTERFACE
 #  undef HAVE_PSI_MUTEX_INTERFACE
-#  undef HAVE_PSI_THREAD_INTERFACE
 #endif
 
 #ifndef TOKU_PTHREAD_DEBUG
@@ -1002,59 +1002,9 @@ static inline void inline_toku_pthread_rwlock_wrunlock(
 
 #endif /* TOKU_PTHREAD_OLD  */
 
-#ifdef HAVE_PSI_THREAD_INTERFACE
-  #define toku_pthread_create(K, P1, P2, P3, P4) \
-    inline_toku_pthread_create(K, P1, P2, P3, P4)
-#else
-  #define toku_pthread_create(K, P1, P2, P3, P4) \
-    inline_toku_pthread_create(P1, P2, P3, P4)
-#endif
-
-#ifdef HAVE_PSI_THREAD_INTERFACE_5
-static inline void inline_toku_thread_set_psi_id(ulong id)
-{
-  struct PSI_thread *psi= PSI_THREAD_CALL(get_thread)();
-  PSI_THREAD_CALL(set_thread_id)(psi, id);
-}
-#endif
-
-static inline int 
-inline_toku_pthread_create(
-#ifdef HAVE_PSI_THREAD_INTERFACE
-   PSI_thread_key key,
-#endif
-toku_pthread_t *thread, const toku_pthread_attr_t *attr, void *(*start_function)(void *), void *arg) {
-    int result;
-#ifdef HAVE_PSI_THREAD_INTERFACE
-    result= PSI_THREAD_CALL(spawn_thread)(key, thread, attr, start_function, arg);
-#else
-    result= pthread_create(thread, attr, start_function, arg);
-#endif    
-    return result;
-}
-
-#ifdef HAVE_PSI_THREAD_INTERFACE
-
-#  define toku_pfs_register_thread(key)                      \
-do {                                                            \
-        struct PSI_thread* psi = PSI_THREAD_CALL(new_thread)(key, NULL, 0);\
-        PSI_THREAD_CALL(set_thread)(psi);                       \
-} while (0)
-
-/* This macro delist the current thread from performance schema */
-#  define toku_pfs_delete_thread()                           \
-do {                                                            \
-        PSI_THREAD_CALL(delete_current_thread)();               \
-} while (0)
-
-#else
-#  define toku_pfs_register_thread(key) do {} while (0)
-#  define toku_pfs_delete_thread() do {} while (0)
-#endif
-
 static inline void *
 toku_pthread_done(void* exit_value) {
-    toku_pfs_delete_thread();
+    toku_instr_delete_current_thread();
     return(exit_value);
 }
 

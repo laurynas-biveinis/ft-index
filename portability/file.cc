@@ -251,7 +251,7 @@ void toku_set_func_pread (ssize_t (*pread_fun)(int, void *, size_t, off_t)) {
 
 
 
-static inline int
+int
 inline_toku_os_delete(const char *name
 #ifdef HAVE_PSI_FILE_INTERFACE
   , const char *src_file, uint src_line
@@ -525,62 +525,47 @@ inline_toku_os_fdopen(int fildes, const char *mode
     
 
 TOKU_FILE *
-inline_toku_os_fopen(const char *filename, const char *mode
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , pfs_key_t psi_key, const char *src_file, uint src_line
-#endif
-){
-    //TOKU_FILE * rval;
+toku_os_fopen_with_source_location(const char *filename, const char *mode,
+                                   pfs_key_t psi_key,
+                                   const char *src_file, uint src_line)
+{
     TOKU_FILE *XMALLOC(rval);
-    if (toku_likely(rval != NULL))
-    {
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* register a file stream open  */
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_open_begin(&state, locker, psi_key, PSI_FILE_STREAM_OPEN, 
+    if (toku_unlikely(rval == NULL))
+        return NULL;
+
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_open_begin(io_annotation, psi_key, toku_instr_fopen,
                                filename, src_file, src_line);
-#endif
-    if (t_fopen)
-	rval->file = t_fopen(filename, mode);
-    else
-	rval->file = fopen(filename, mode);
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* Regsiter the returning "file" value with the system */
-    register_pfs_file_stream_open_end(locker, rval->file, rval->psi_key);
-#endif
+    rval->file = t_fopen ? t_fopen(filename, mode) : fopen(filename, mode);
+    /* Register the returning "file" value with the system */
+    toku_instr_fopen_end(io_annotation, *rval);
     if (toku_unlikely(rval->file == NULL))
     {
       toku_free(rval);
       rval=NULL;
     }
-    }      
     return rval;
 }
 
-int 
-inline_toku_os_open(const char *path, int oflag, int mode
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , pfs_key_t psi_key, const char *src_file, uint src_line
-#endif
-) {
+int
+toku_os_open_with_source_location(const char *path, int oflag, int mode,
+                                  pfs_key_t psi_key,
+                                  const char *src_file, uint src_line)
+{
     int rval;
-#ifdef HAVE_PSI_FILE_INTERFACE
+    toku_io_instrumentation io_annotation;
     /* register a file open or creation depending on "oflag" */
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_open_begin(&state, locker, psi_key, 
-                                 ((oflag & O_CREAT)
-                                 ? PSI_FILE_CREATE
-                                 : PSI_FILE_OPEN),
+    toku_instr_file_open_begin(io_annotation, psi_key,
+                               ((oflag & O_CREAT)
+                                ? toku_instr_create
+                                : toku_instr_open),
                                path, src_file, src_line);
-#endif
     if (t_open)
 	rval = t_open(path, oflag, mode);
     else
 	rval = open(path, oflag, mode);
 #ifdef HAVE_PSI_FILE_INTERFACE
-    /* Regsiter the returning "rval" value with the system */
+    /* Register the returning "rval" value with the system */
 //    fprintf(stderr,"inline_toku_os_open: open fd: %d\n", rval);
     register_pfs_file_open_end(locker, rval);
 #endif
@@ -588,11 +573,7 @@ inline_toku_os_open(const char *path, int oflag, int mode
 }
 
 int
-toku_os_open_direct(const char *path, int oflag, int mode
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , pfs_key_t psi_key
-#endif
-) {
+toku_os_open_direct(const char *path, int oflag, int mode, pfs_key_t psi_key) {
     int rval;
 #if defined(HAVE_O_DIRECT)
     rval = toku_os_open(path, oflag | O_DIRECT, mode, psi_key);

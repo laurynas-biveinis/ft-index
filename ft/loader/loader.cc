@@ -397,6 +397,7 @@ int ft_loader_open_temp_file (FTLOADER bl, FIDX *file_idx)
 }
 
 
+#if 0
 int ft_loader_open_temp_file_orig (FTLOADER bl, FIDX *file_idx)
 /* Effect: Open a temporary file in read-write mode.  Save enough information to close and delete the file later.
  * Return value: 0 on success, an error number otherwise.
@@ -436,6 +437,7 @@ int ft_loader_open_temp_file_orig (FTLOADER bl, FIDX *file_idx)
     }
     return result;
 }
+#endif
 
 
 void toku_ft_loader_internal_destroy (FTLOADER bl, bool is_error) {
