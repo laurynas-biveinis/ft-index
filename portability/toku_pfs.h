@@ -2,6 +2,8 @@
 
 #include <stdio.h> // FILE
 
+enum toku_instr_object_type { mutex, thread, file };
+
 struct PSI_file;
 
 struct TOKU_FILE
@@ -11,9 +13,38 @@ struct TOKU_FILE
     struct PSI_file *psi_key;
 };
 
+class toku_instr_key;
+
+class toku_instr_probe_empty
+{
+public:
+    explicit toku_instr_probe_empty(UU(const toku_instr_key &key)) { }
+
+    void start_with_source_location(UU(const char *src_file), UU(int src_line))
+    { }
+
+    void stop() { }
+};
+
+#define TOKU_PROBE_START(p) p->start_with_source_location(__FILE__, __LINE__)
+
+extern toku_instr_key toku_uninstrumented;
+
 #ifndef MYSQL_TOKUDB_ENGINE
 
 #include <pthread.h>
+
+class toku_instr_key
+{
+public:
+    toku_instr_key(UU(toku_instr_object_type type), UU(const char *group),
+                   UU(const char *name)) { }
+
+    explicit toku_instr_key(UU(pfs_key_t key_id)) { }
+
+};
+
+typedef toku_instr_probe_empty toku_instr_probe;
 
 enum toku_instr_file_op { toku_instr_fopen, toku_instr_create,
                           toku_instr_open };
@@ -23,7 +54,7 @@ struct PSI_file { };
 struct toku_io_instrumentation { };
 
 inline
-int toku_pthread_create(UU(pfs_key_t key), pthread_t *thread,
+int toku_pthread_create(UU(const toku_instr_key &key), pthread_t *thread,
                         const pthread_attr_t *attr,
                         void *(*start_routine)(void*), void *arg)
 {
@@ -38,7 +69,8 @@ void toku_instr_delete_current_thread()
 // Instrument file creation, opening, closing, and renaming
 inline
 void toku_instr_file_open_begin(UU(toku_io_instrumentation &io_instr),
-                                UU(pfs_key_t key), UU(toku_instr_file_op op),
+                                UU(const toku_instr_key &key),
+                                UU(toku_instr_file_op op),
                                 UU(const char *name), UU(const char *src_file),
                                 UU(int src_line))
 {
@@ -58,11 +90,28 @@ void toku_instr_fopen_end(UU(toku_io_instrumentation &io_instr),
 
 #endif // MYSQL_TOKUDB_ENGINE
 
+extern toku_instr_key toku_uninstrumented;
+
+extern toku_instr_probe *toku_instr_probe_1;
+
+//threads
+extern toku_instr_key *extractor_thread_key;
+extern toku_instr_key *fractal_thread_key;
+extern toku_instr_key *io_thread_key;
+extern toku_instr_key *eviction_thread_key;
+extern toku_instr_key *kibbutz_thread_key;
+extern toku_instr_key *minicron_thread_key;
+extern toku_instr_key *tp_internal_thread_key;
+
+// Files
+extern toku_instr_key *tokudb_file_data_key;
+extern toku_instr_key *tokudb_file_load_key;
+extern toku_instr_key *tokudb_file_tmp_key;
+extern toku_instr_key *tokudb_file_log_key;
+
 // UNCONVERTED PART BELOW
 
 #define PFS_NOT_INSTRUMENTED           0xFFFFFFFF
-
-extern pfs_key_t  tokudb_file_data_key;
 
 /* Following four macros are instumentations to register
 various file I/O operations with performance schema.

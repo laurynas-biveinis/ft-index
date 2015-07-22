@@ -170,7 +170,6 @@ typedef struct toku_rwlock {
 
 typedef toku_pfs_rwlock_t toku_pthread_rwlock_t;
 
-extern toku_mutex_t  fti_probe_mutex_1;
 extern toku_mutex_t  fti_probe_mutex_2;
 extern toku_mutex_t  fti_probe_mutex_3;
 extern toku_mutex_t  fti_probe_mutex_4;
@@ -420,39 +419,6 @@ toku_pthread_rwlock_wrunlock(toku_pthread_rwlock_t *rwlock) {
 #define toku_mutex_unlock(M) \
     inline_toku_mutex_unlock(M) 
 
-#if defined (HAVE_PSI_MUTEX_INTERFACE)
-#define fti_probe_start(probe_mutex) \
-        /* Instrumentation start */ \
-        PSI_mutex_locker *locker; \
-        locker=NULL; \
-        PSI_mutex_locker_state state; \
-        if ((probe_mutex)->psi_mutex != NULL) \
-        locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, (probe_mutex)->psi_mutex, PSI_MUTEX_LOCK, __FILE__, __LINE__); 
-
-#define fti_probe_stop(probe_mutex) \
-        /* Instrumentation end */ \
-        if ((probe_mutex)->psi_mutex != NULL && locker != NULL) \
-           PSI_MUTEX_CALL(end_mutex_wait)(locker, 0); 
-#else
-
-#define fti_probe_start(probe_mutex) do {} while (0); 
-#define fti_probe_stop(probe_mutex) do {} while (0);
-
-#endif
-
-#define start_probe1 fti_probe_start(&fti_probe_mutex_1)
-#define stop_probe1 fti_probe_stop(&fti_probe_mutex_1)
-
-#define start_probe2 fti_probe_start(&fti_probe_mutex_2)
-#define stop_probe2 fti_probe_stop(&fti_probe_mutex_2)
-
-#define start_probe3 fti_probe_start(&fti_probe_mutex_3)
-#define stop_probe3 fti_probe_stop(&fti_probe_mutex_3)
-
-#define start_probe4 fti_probe_start(&fti_probe_mutex_4)
-#define stop_probe4 fti_probe_stop(&fti_probe_mutex_4)
-
- 
 static inline void inline_toku_mutex_unlock(toku_mutex_t *mutex)   
 {     
 

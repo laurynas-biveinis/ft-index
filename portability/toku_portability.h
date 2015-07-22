@@ -327,19 +327,21 @@ void toku_os_recursive_delete(const char *path);
 
 TOKU_FILE * toku_os_fopen_with_source_location(const char *filename,
                                                const char *mode,
-                                               pfs_key_t psi_key,
+                                               const toku_instr_key &instr_key,
                                                const char *src_file,
                                                uint src_line);
 #define toku_os_fopen(F, M, K) \
     toku_os_fopen_with_source_location(F, M, K, __FILE__, __LINE__)
 
 int toku_os_open_with_source_location(const char *path, int oflag, int mode,
-                                      pfs_key_t psi_key, const char *src_file,
+                                      const toku_instr_key &instr_key,
+                                      const char *src_file,
                                       uint src_line);
 #define toku_os_open(FD, F, M, K) \
     toku_os_open_with_source_location(FD, F, M, K, __FILE__, __LINE__)
 
-int toku_os_open_direct(const char *path, int oflag, int mode, pfs_key_t psi_key);
+int toku_os_open_direct(const char *path, int oflag, int mode,
+                        const toku_instr_key &instr_key);
 
 #ifdef HAVE_PSI_FILE_INTERFACE
 int inline_toku_os_close(int fd, const char *src_file, uint src_line);

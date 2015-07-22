@@ -106,7 +106,7 @@ static const int log_format_version=TOKU_LOG_VERSION;
 
 pfs_key_t result_output_condition_lock_mutex_key;
 pfs_key_t result_output_condition_key;
-pfs_key_t tokudb_file_log_key;
+toku_instr_key *tokudb_file_log_key;
 
 static int open_logfile (TOKULOGGER logger);
 static void logger_write_buffer (TOKULOGGER logger, LSN *fsynced_lsn);
@@ -742,7 +742,8 @@ static int open_logfile (TOKULOGGER logger)
     long long index = logger->next_log_file_number;
     if (logger->write_log_files) {
 //        logger->fd = open(fname, O_CREAT+O_WRONLY+O_TRUNC+O_EXCL+O_BINARY, S_IRUSR+S_IWUSR);
-          logger->fd = toku_os_open(fname, O_CREAT+O_WRONLY+O_TRUNC+O_EXCL+O_BINARY, S_IRUSR+S_IWUSR, tokudb_file_log_key);
+          logger->fd = toku_os_open(fname, O_CREAT+O_WRONLY+O_TRUNC+O_EXCL+O_BINARY,
+                                    S_IRUSR+S_IWUSR, *tokudb_file_log_key);
         if (logger->fd==-1) {
             return get_error_errno();
         }
@@ -750,7 +751,8 @@ static int open_logfile (TOKULOGGER logger)
         logger->next_log_file_number++;
     } else {
 //        logger->fd = open(DEV_NULL_FILE, O_WRONLY+O_BINARY);
-          logger->fd = toku_os_open(DEV_NULL_FILE, O_WRONLY+O_BINARY, S_IWUSR, tokudb_file_log_key);
+          logger->fd = toku_os_open(DEV_NULL_FILE, O_WRONLY+O_BINARY, S_IWUSR,
+                                    *tokudb_file_log_key);
         if (logger->fd==-1) {
             return get_error_errno();
         }
@@ -1304,7 +1306,8 @@ void toku_txnid2txn(TOKULOGGER logger, TXNID_PAIR txnid, TOKUTXN *result) {
 // Find the earliest LSN in a log.  No locks are needed.
 static int peek_at_log (TOKULOGGER logger, char* filename, LSN *first_lsn) {
 //    int fd = open(filename, O_RDONLY+O_BINARY);
-    int fd = toku_os_open(filename, O_RDONLY+O_BINARY, S_IRUSR, tokudb_file_log_key);
+    int fd = toku_os_open(filename, O_RDONLY+O_BINARY, S_IRUSR,
+                          *tokudb_file_log_key);
     if (fd<0) {
         int er = get_error_errno();
         if (logger->write_log_files) printf("couldn't open: %s\n", strerror(er));

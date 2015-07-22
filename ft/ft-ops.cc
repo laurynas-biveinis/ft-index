@@ -241,17 +241,17 @@ static FT_STATUS_S ft_status;
 
 static toku_mutex_t ft_open_close_lock;
 
-#ifdef HAVE_PSI_INTERFACE
-//probe mutexes
-toku_mutex_t  fti_probe_mutex_1; 
-toku_mutex_t  fti_probe_mutex_2; 
-toku_mutex_t  fti_probe_mutex_3;
-toku_mutex_t  fti_probe_mutex_4;
+static toku_instr_key *fti_probe_1_key;
+static toku_instr_key *fti_probe_2_key;
+static toku_instr_key *fti_probe_3_key;
+static toku_instr_key *fti_probe_4_key;
 
-pfs_key_t fti_probe_mutex_1_key;
-pfs_key_t fti_probe_mutex_2_key;
-pfs_key_t fti_probe_mutex_3_key;
-pfs_key_t fti_probe_mutex_4_key;
+toku_instr_probe *toku_instr_probe_1;
+toku_instr_probe *toku_instr_probe_2;
+toku_instr_probe *toku_instr_probe_3;
+toku_instr_probe *toku_instr_probe_4;
+
+#ifdef HAVE_PSI_INTERFACE
 
 //ft-index mutexes
 pfs_key_t ft_open_close_lock_mutex_key;
@@ -327,45 +327,7 @@ extern pfs_key_t cachetable_value_key;
 extern pfs_key_t safe_file_size_lock_rwlock_key;
 extern pfs_key_t cachetable_disk_nb_rwlock_key;
 
-//threads
-extern pfs_key_t extractor_thread_key;
-extern pfs_key_t fractal_thread_key;
-extern pfs_key_t io_thread_key;
-extern pfs_key_t eviction_thread_key;
-extern pfs_key_t kibbutz_thread_key;
-extern pfs_key_t minicron_thread_key;
-extern pfs_key_t tp_internal_thread_key;
-
 //extern pfs_key_t fmutex_cond_key;   
-
-extern pfs_key_t tokudb_file_data_key;
-extern pfs_key_t tokudb_file_log_key;
-extern pfs_key_t tokudb_file_tmp_key;
-extern pfs_key_t tokudb_file_load_key;
-
-static PSI_file_info    all_ftindex_files[] = {
-        {&tokudb_file_data_key, "tokudb_data_file", 0},
-        {&tokudb_file_log_key,  "tokudb_log_file", 0},        
-        {&tokudb_file_tmp_key,  "tokudb_tmp_file", 0},       
-        {&tokudb_file_load_key, "tokudb_load_file", 0}
-};
-
-static PSI_thread_info  all_ftindex_threads[] = {
-        {&extractor_thread_key, "extractor_thread", 0},
-        {&fractal_thread_key, "fractal_thread", 0},
-        {&io_thread_key, "io_thread", 0},
-        {&eviction_thread_key, "eviction_thread", 0},
-        {&kibbutz_thread_key, "kibbutz_thread", 0},
-        {&minicron_thread_key, "minicron_thread", 0},
-        {&tp_internal_thread_key, "tp_internal_thread", 0},
-};
-
-static PSI_mutex_info   all_ftindex_probe_mutexes[] = {
-        {&fti_probe_mutex_1_key,"fti_probe_mutex_1",0},
-        {&fti_probe_mutex_2_key,"fti_probe_mutex_2",0},        
-        {&fti_probe_mutex_3_key,"fti_probe_mutex_3",0},
-        {&fti_probe_mutex_4_key,"fti_probe_mutex_4",0},
-};
 
 static PSI_mutex_info   all_ftindex_mutexes[] = {
         {&txn_manager_lock_mutex_key, "txn_manager_lock_mutex", 0},
@@ -2979,9 +2941,10 @@ void toku_ft_set_direct_io (bool direct_io_on) {
 
 static inline int ft_open_maybe_direct(const char *filename, int oflag, int mode) {
     if (use_direct_io) {
-        return toku_os_open_direct(filename, oflag, mode, tokudb_file_data_key);
+        return toku_os_open_direct(filename, oflag, mode,
+                                   *tokudb_file_data_key);
     } else {
-        return toku_os_open(filename, oflag, mode, tokudb_file_data_key);
+        return toku_os_open(filename, oflag, mode, *tokudb_file_data_key);
     }
 }
 
@@ -4745,9 +4708,6 @@ int toku_ft_layer_init(void) {
 #ifdef HAVE_PSI_INTERFACE
     int count;
 
-    count = array_elements(all_ftindex_probe_mutexes);
-    mysql_mutex_register("fti", all_ftindex_probe_mutexes, count);
-
     count = array_elements(all_ftindex_mutexes);
     mysql_mutex_register("fti", all_ftindex_mutexes, count);
     
@@ -4756,21 +4716,30 @@ int toku_ft_layer_init(void) {
   
     count = array_elements(all_ftindex_conds);
     mysql_cond_register("fti", all_ftindex_conds, count);
-
-    count = array_elements(all_ftindex_threads);
-    mysql_thread_register("fti", all_ftindex_threads, count);
-
-    count = array_elements(all_ftindex_files);
-    mysql_file_register("fti", all_ftindex_files, count);
-
 #endif
 
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-    toku_mutex_init(fti_probe_mutex_1_key, &fti_probe_mutex_1, NULL);
-    toku_mutex_init(fti_probe_mutex_2_key, &fti_probe_mutex_2, NULL);    
-    toku_mutex_init(fti_probe_mutex_3_key, &fti_probe_mutex_3, NULL);
-    toku_mutex_init(fti_probe_mutex_4_key, &fti_probe_mutex_4, NULL);
-#endif        
+    tokudb_file_data_key = new toku_instr_key(file, "fti", "tokudb_data_file");
+    tokudb_file_load_key = new toku_instr_key(file, "fti", "tokudb_load_file");
+    tokudb_file_tmp_key = new toku_instr_key(file, "fti", "tokudb_tmp_file");
+    tokudb_file_log_key = new toku_instr_key(file, "fti", "tokudb_log_file");
+
+    fti_probe_1_key = new toku_instr_key(mutex, "fti", "fti_probe_1");
+    fti_probe_2_key = new toku_instr_key(mutex, "fti", "fti_probe_2");
+    fti_probe_3_key = new toku_instr_key(mutex, "fti", "fti_probe_3");
+    fti_probe_4_key = new toku_instr_key(mutex, "fti", "fti_probe_4");
+
+    extractor_thread_key = new toku_instr_key(thread, "fti", "extractor_thread");
+    fractal_thread_key = new toku_instr_key(thread, "fti", "fractal_thread");
+    io_thread_key = new toku_instr_key(thread, "fti", "io_thread");
+    eviction_thread_key = new toku_instr_key(thread, "fti", "eviction_thread");
+    kibbutz_thread_key = new toku_instr_key(thread, "fti", "kibbutz_thread");
+    minicron_thread_key = new toku_instr_key(thread, "fti", "minicron_thread");
+    tp_internal_thread_key = new toku_instr_key(thread, "fti", "tp_internal_thread");
+
+    toku_instr_probe_1 = new toku_instr_probe(*fti_probe_1_key);
+    toku_instr_probe_2 = new toku_instr_probe(*fti_probe_2_key);
+    toku_instr_probe_3 = new toku_instr_probe(*fti_probe_3_key);
+    toku_instr_probe_4 = new toku_instr_probe(*fti_probe_4_key);
 
     r = db_env_set_toku_product_name("tokudb");
     if (r) { goto exit; }
@@ -4802,8 +4771,11 @@ void toku_ft_layer_destroy(void) {
     toku_mutex_destroy(&fti_probe_mutex_4);
     toku_mutex_destroy(&fti_probe_mutex_3);    
     toku_mutex_destroy(&fti_probe_mutex_2);
-    toku_mutex_destroy(&fti_probe_mutex_1);
-#endif        
+#endif
+    delete toku_instr_probe_1;
+    delete toku_instr_probe_2;
+    delete toku_instr_probe_3;
+    delete toku_instr_probe_4;
 
     //Portability must be cleaned up last
     toku_portability_destroy();

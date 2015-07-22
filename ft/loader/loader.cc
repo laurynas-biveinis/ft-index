@@ -119,11 +119,11 @@ pfs_key_t loader_bl_mutex_key;
 pfs_key_t loader_fi_lock_mutex_key;
 pfs_key_t loader_out_mutex_key;
 
-pfs_key_t extractor_thread_key;
-pfs_key_t fractal_thread_key;
+toku_instr_key *extractor_thread_key;
+toku_instr_key *fractal_thread_key;
 
-pfs_key_t tokudb_file_tmp_key; 
-pfs_key_t tokudb_file_load_key;
+toku_instr_key *tokudb_file_tmp_key;
+toku_instr_key *tokudb_file_load_key;
 
 
 /*
@@ -299,7 +299,8 @@ int ft_loader_fi_reopen (struct file_infos *fi, FIDX idx, const char *mode) {
     invariant(i>=0 && i<fi->n_files);
     invariant(!fi->file_infos[i].is_open);
     invariant(fi->file_infos[i].is_extant);
-    fi->file_infos[i].file = toku_os_fopen(fi->file_infos[i].fname, mode, tokudb_file_load_key);
+    fi->file_infos[i].file = toku_os_fopen(fi->file_infos[i].fname, mode,
+                                           *tokudb_file_load_key);
     if (fi->file_infos[i].file == NULL) { 
         result = get_error_errno();
     } else {
@@ -381,7 +382,7 @@ int ft_loader_open_temp_file (FTLOADER bl, FIDX *file_idx)
       result = get_error_errno();
     else 
     {
-       f = toku_os_fopen(fname, "r+", tokudb_file_tmp_key);
+       f = toku_os_fopen(fname, "r+", *tokudb_file_tmp_key);
        if (f->file == NULL)
          result = get_error_errno();
        else
@@ -738,7 +739,9 @@ int toku_ft_loader_open (FTLOADER *blp, /* out */
     }
     if (result==0 && allow_puts) {
         FTLOADER bl = *blp;
-        int r = toku_pthread_create(extractor_thread_key, &bl->extractor_thread, NULL, extractor_thread, (void*)bl); 
+        int r = toku_pthread_create(*extractor_thread_key,
+                                    &bl->extractor_thread, NULL,
+                                    extractor_thread, (void*)bl);
         if (r==0) {
             bl->extractor_live = true;
         } else  { 
@@ -2791,7 +2794,8 @@ static int loader_do_i (FTLOADER bl,
 
     {
         mode_t mode = S_IRUSR+S_IWUSR + S_IRGRP+S_IWGRP;
-        int fd = toku_os_open(new_fname, O_RDWR| O_CREAT | O_BINARY, mode, tokudb_file_load_key); // #2621
+        int fd = toku_os_open(new_fname, O_RDWR| O_CREAT | O_BINARY, mode,
+                              *tokudb_file_load_key); // #2621
         if (fd < 0) {
             r = get_error_errno(); goto error;
         }
@@ -2828,7 +2832,9 @@ static int loader_do_i (FTLOADER bl,
                 target_fanout
             };
 
-            r = toku_pthread_create(fractal_thread_key, bl->fractal_threads+which_db, NULL, fractal_thread, (void*)&fta);
+            r = toku_pthread_create(*fractal_thread_key,
+                                    bl->fractal_threads+which_db, NULL,
+                                    fractal_thread, (void*)&fta);
             if (r) {
                 int r2 __attribute__((__unused__)) = toku_queue_destroy(bl->fractal_queues[which_db]);            
                 // ignore r2, since we already have an error

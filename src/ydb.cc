@@ -881,15 +881,15 @@ env_open(DB_ENV * env, const char *home, uint32_t flags, int mode) {
     env->i->open_mode = mode;
 
     //Instrumentation probe start
-    start_probe1;
+    TOKU_PROBE_START(toku_instr_probe_1);
 
     env_setup_real_data_dir(env);
     env_setup_real_log_dir(env);
     env_setup_real_tmp_dir(env);
 
     //Instrumentation probe start
-    stop_probe1;
-    
+    toku_instr_probe_1->stop();
+
     r = toku_single_process_lock(env->i->dir, "environment", &env->i->envdir_lockfd);
     if (r!=0) goto cleanup;
     r = toku_single_process_lock(env->i->real_data_dir, "data", &env->i->datadir_lockfd);

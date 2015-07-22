@@ -103,7 +103,7 @@ PATENT RIGHTS GRANT:
 
 pfs_key_t bfs_mutex_key;
 pfs_key_t bfs_cond_key;
-pfs_key_t io_thread_key;
+toku_instr_key *io_thread_key;
 
 struct dbufio_file {
     // i/o thread owns these
@@ -489,7 +489,8 @@ int create_dbufio_fileset (DBUFIO_FILESET *bfsp, int N, int fds[/*N*/], size_t b
     }
     //printf("Creating IO thread\n");
     if (result==0) {
-	result = toku_pthread_create(io_thread_key, &bfs->iothread, NULL, io_thread, (void*)bfs);
+	result = toku_pthread_create(*io_thread_key, &bfs->iothread, NULL,
+                                     io_thread, (void*)bfs);
     }
     if (result==0) { *bfsp = bfs; return 0; }
     // Now undo everything.

@@ -512,3 +512,5 @@ toku_portability_helgrind_ignore(void) {
     TOKU_VALGRIND_HG_DISABLE_CHECKING(&toku_cached_hz, sizeof toku_cached_hz);
     TOKU_VALGRIND_HG_DISABLE_CHECKING(&toku_cached_pagesize, sizeof toku_cached_pagesize);
 }
+
+toku_instr_key toku_uninstrumented(PFS_NOT_INSTRUMENTED);

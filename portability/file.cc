@@ -106,8 +106,8 @@ PATENT RIGHTS GRANT:
 
 
 #include <toku_pfs.h>
-pfs_key_t tokudb_file_data_key;
 
+toku_instr_key *tokudb_file_data_key;
 
 static int toku_assert_on_write_enospc = 0;
 static const int toku_write_enospc_sleep = 1;
@@ -262,7 +262,7 @@ inline_toku_os_delete(const char *name
 #ifdef HAVE_PSI_FILE_INTERFACE   
     struct PSI_file_locker *locker;
     PSI_file_locker_state state;
-    register_pfs_file_name_close_begin(&state, locker, tokudb_file_data_key,
+    register_pfs_file_name_close_begin(&state, locker, *tokudb_file_data_key,
                                        PSI_FILE_DELETE, name, src_file, src_line);
 #endif
     result= unlink(name);
@@ -526,7 +526,7 @@ inline_toku_os_fdopen(int fildes, const char *mode
 
 TOKU_FILE *
 toku_os_fopen_with_source_location(const char *filename, const char *mode,
-                                   pfs_key_t psi_key,
+                                   const toku_instr_key &instr_key,
                                    const char *src_file, uint src_line)
 {
     TOKU_FILE *XMALLOC(rval);
@@ -534,7 +534,7 @@ toku_os_fopen_with_source_location(const char *filename, const char *mode,
         return NULL;
 
     toku_io_instrumentation io_annotation;
-    toku_instr_file_open_begin(io_annotation, psi_key, toku_instr_fopen,
+    toku_instr_file_open_begin(io_annotation, instr_key, toku_instr_fopen,
                                filename, src_file, src_line);
     rval->file = t_fopen ? t_fopen(filename, mode) : fopen(filename, mode);
     /* Register the returning "file" value with the system */
@@ -549,13 +549,13 @@ toku_os_fopen_with_source_location(const char *filename, const char *mode,
 
 int
 toku_os_open_with_source_location(const char *path, int oflag, int mode,
-                                  pfs_key_t psi_key,
+                                  const toku_instr_key &instr_key,
                                   const char *src_file, uint src_line)
 {
     int rval;
     toku_io_instrumentation io_annotation;
     /* register a file open or creation depending on "oflag" */
-    toku_instr_file_open_begin(io_annotation, psi_key,
+    toku_instr_file_open_begin(io_annotation, instr_key,
                                ((oflag & O_CREAT)
                                 ? toku_instr_create
                                 : toku_instr_open),
@@ -573,12 +573,13 @@ toku_os_open_with_source_location(const char *path, int oflag, int mode,
 }
 
 int
-toku_os_open_direct(const char *path, int oflag, int mode, pfs_key_t psi_key) {
+toku_os_open_direct(const char *path, int oflag, int mode,
+                    const toku_instr_key &instr_key) {
     int rval;
 #if defined(HAVE_O_DIRECT)
-    rval = toku_os_open(path, oflag | O_DIRECT, mode, psi_key);
+    rval = toku_os_open(path, oflag | O_DIRECT, mode, instr_key);
 #elif defined(HAVE_F_NOCACHE)
-    rval = toku_os_open(path, oflag, mode, psi_key);
+    rval = toku_os_open(path, oflag, mode, instr_key);
     if (rval >= 0) {
         int r = fcntl(rval, F_NOCACHE, 1);
         if (r == -1) {

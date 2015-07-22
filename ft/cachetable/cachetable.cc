@@ -127,7 +127,7 @@ pfs_key_t cachetable_m_flow_control_cond_key;
 pfs_key_t cachetable_m_ev_thread_cond_key;
 
 pfs_key_t log_internal_lock_mutex_key;
-pfs_key_t eviction_thread_key;
+toku_instr_key *eviction_thread_key;
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
@@ -3700,7 +3700,8 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_run_thread = true;
     m_num_eviction_thread_runs = 0;
     m_ev_thread_init = false;
-    r = toku_pthread_create(eviction_thread_key, &m_ev_thread, NULL, eviction_thread, this); 
+    r = toku_pthread_create(*eviction_thread_key, &m_ev_thread, NULL,
+                            eviction_thread, this);
     if (r == 0) {
         m_ev_thread_init = true;
     }

@@ -115,7 +115,7 @@ static TOKU_FILE *ba_trace_file = nullptr;
 void block_allocator::maybe_initialize_trace(void) {
     const char *ba_trace_path = getenv("TOKU_BA_TRACE_PATH");        
     if (ba_trace_path != nullptr) {
-        ba_trace_file = toku_os_fopen(ba_trace_path, "w", PFS_NOT_INSTRUMENTED);
+        ba_trace_file = toku_os_fopen(ba_trace_path, "w", toku_uninstrumented);
         if (ba_trace_file->file == nullptr) {
             fprintf(stderr, "tokuft: error: block allocator trace path found in environment (%s), "
                             "but it could not be opened for writing (errno %d)\n",

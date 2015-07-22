@@ -97,7 +97,7 @@ PATENT RIGHTS GRANT:
 
 pfs_key_t minicron_p_mutex_key;
 pfs_key_t minicron_p_condvar_key;
-pfs_key_t minicron_thread_key;
+toku_instr_key *minicron_thread_key;
 
 static void
 toku_gettime (toku_timespec_t *a) {
@@ -198,7 +198,7 @@ toku_minicron_setup(struct minicron *p, uint32_t period_in_ms, int(*f)(void *), 
     p->do_shutdown = false;
     toku_mutex_init(minicron_p_mutex_key, &p->mutex, 0);
     toku_cond_init(minicron_p_condvar_key, &p->condvar, 0);
-    return toku_pthread_create(minicron_thread_key, &p->thread, 0, minicron_do, p);
+    return toku_pthread_create(*minicron_thread_key, &p->thread, 0, minicron_do, p);
 }
     
 void
