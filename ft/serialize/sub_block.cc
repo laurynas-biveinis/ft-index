@@ -104,7 +104,7 @@ PATENT RIGHTS GRANT:
 #include "util/threadpool.h"
 #include "util/x1764.h"
 
-pfs_key_t workset_lock_mutex_key;
+toku_instr_key *workset_lock_mutex_key;
 pfs_key_t ws_worker_wait_key;
 
 SUB_BLOCK sub_block_creat(void) {

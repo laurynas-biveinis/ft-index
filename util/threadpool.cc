@@ -101,7 +101,7 @@ PATENT RIGHTS GRANT:
 
 #include "threadpool.h"
 
-pfs_key_t tpool_lock_mutex_key;
+toku_instr_key *tpool_lock_mutex_key;
 pfs_key_t tp_thread_wait_key;
 pfs_key_t tp_pool_wait_free_key;
 toku_instr_key *tp_internal_thread_key;
@@ -216,7 +216,7 @@ toku_thread_pool_create(struct toku_thread_pool **pool_return, int max_threads) 
     if (pool == nullptr) {
         r = get_error_errno();
     } else {
-        toku_mutex_init(tpool_lock_mutex_key, &pool->lock, nullptr);
+        toku_mutex_init(*tpool_lock_mutex_key, &pool->lock, nullptr);
         toku_list_init(&pool->free_threads);
         toku_list_init(&pool->all_threads);
         toku_cond_init(tp_pool_wait_free_key, &pool->wait_free, nullptr);

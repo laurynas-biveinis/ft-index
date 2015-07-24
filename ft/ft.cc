@@ -103,7 +103,7 @@ PATENT RIGHTS GRANT:
 #include <toku_assert.h>
 #include <portability/toku_atomic.h>
 
-pfs_key_t ft_ref_lock_mutex_key;
+toku_instr_key *ft_ref_lock_mutex_key;
 
 void 
 toku_reset_root_xid_that_created(FT ft, TXNID new_root_xid_that_created) {
@@ -157,7 +157,7 @@ toku_ft_free (FT ft) {
 
 void
 toku_ft_init_reflock(FT ft) {
-    toku_mutex_init(ft_ref_lock_mutex_key,&ft->ft_ref_lock, NULL);
+    toku_mutex_init(*ft_ref_lock_mutex_key, &ft->ft_ref_lock, NULL);
 }
 
 void

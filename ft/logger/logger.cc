@@ -104,7 +104,7 @@ PATENT RIGHTS GRANT:
 
 static const int log_format_version=TOKU_LOG_VERSION;
 
-pfs_key_t result_output_condition_lock_mutex_key;
+toku_instr_key *result_output_condition_lock_mutex_key;
 pfs_key_t result_output_condition_key;
 toku_instr_key *tokudb_file_log_key;
 
@@ -190,7 +190,8 @@ int toku_logger_create (TOKULOGGER *resultp) {
     toku_logfilemgr_create(&result->logfilemgr);
     *resultp=result;
     ml_init(&result->input_lock);
-    toku_mutex_init(result_output_condition_lock_mutex_key, &result->output_condition_lock, NULL);
+    toku_mutex_init(*result_output_condition_lock_mutex_key,
+                    &result->output_condition_lock, nullptr);
     toku_cond_init(result_output_condition_key,&result->output_condition,       NULL);
     result->rollback_cachefile = NULL;
     result->output_is_available = true;

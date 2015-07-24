@@ -95,9 +95,6 @@ PATENT RIGHTS GRANT:
 #include <toku_list.h>
 #include <toku_pthread.h>
 
-extern pfs_key_t workset_lock_mutex_key;
-extern pfs_key_t ws_worker_wait_key;
-
 // The work struct is the base class for work to be done by some threads
 struct work {
     struct toku_list next;
@@ -113,7 +110,7 @@ struct workset {
 
 static inline void 
 workset_init(struct workset *ws) {
-    toku_mutex_init(workset_lock_mutex_key, &ws->lock, NULL);
+    toku_mutex_init(*workset_lock_mutex_key, &ws->lock, NULL);
     toku_list_init(&ws->worklist);
     ws->refs = 1;      // the calling thread gets a reference
     toku_cond_init(ws_worker_wait_key, &ws->worker_wait, NULL);

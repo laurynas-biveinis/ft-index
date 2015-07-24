@@ -2,7 +2,7 @@
 
 #include <stdio.h> // FILE
 
-enum toku_instr_object_type { mutex, thread, file };
+enum class toku_instr_object_type { mutex, thread, file };
 
 struct PSI_file;
 
@@ -46,10 +46,10 @@ public:
 
 typedef toku_instr_probe_empty toku_instr_probe;
 
-enum toku_instr_file_op { toku_instr_fopen, toku_instr_create,
-                          toku_instr_open };
+enum class toku_instr_file_op { fopen, create, open };
 
 struct PSI_file { };
+struct PSI_mutex { };
 
 struct toku_io_instrumentation { };
 
@@ -82,6 +82,47 @@ void toku_instr_fopen_end(UU(toku_io_instrumentation &io_instr),
 {
 }
 
+struct toku_mutex_t;
+
+struct toku_mutex_instrumentation { };
+
+inline
+PSI_mutex* toku_instr_mutex_init(UU(const toku_instr_key &key),
+                                 UU(const toku_mutex_t &mutex))
+{
+    return nullptr;
+}
+
+inline
+void toku_instr_mutex_destroy(UU(PSI_mutex* &mutex_instr))
+{
+}
+
+inline
+void toku_instr_mutex_lock_start(UU(toku_mutex_instrumentation &mutex_instr),
+                                 UU(toku_mutex_t &mutex),
+                                 UU(const char *src_file), UU(int src_line))
+{
+}
+
+inline
+void toku_instr_mutex_trylock_start(UU(toku_mutex_instrumentation &mutex_instr),
+                                    UU(toku_mutex_t &mutex),
+                                    UU(const char *src_file), UU(int src_line))
+{
+}
+
+inline
+void toku_instr_mutex_lock_end(UU(toku_mutex_instrumentation &mutex_instr),
+                               UU(int pthread_mutex_lock_result))
+{
+}
+
+inline
+void toku_instr_mutex_unlock(UU(PSI_mutex *mutex_instr))
+{
+}
+
 #else // MYSQL_TOKUDB_ENGINE
 
 #include <toku_mysql.h>
@@ -108,6 +149,39 @@ extern toku_instr_key *tokudb_file_data_key;
 extern toku_instr_key *tokudb_file_load_key;
 extern toku_instr_key *tokudb_file_tmp_key;
 extern toku_instr_key *tokudb_file_log_key;
+
+// Mutexes
+extern toku_instr_key *kibbutz_mutex_key;
+extern toku_instr_key *minicron_p_mutex_key;
+extern toku_instr_key *queue_result_mutex_key;
+extern toku_instr_key *tpool_lock_mutex_key;
+extern toku_instr_key *workset_lock_mutex_key;
+extern toku_instr_key *bjm_jobs_lock_mutex_key;
+extern toku_instr_key *log_internal_lock_mutex_key;
+extern toku_instr_key *cachetable_ev_thread_lock_mutex_key;
+extern toku_instr_key *checkpoint_safe_mutex_key;
+extern toku_instr_key *ft_ref_lock_mutex_key;
+extern toku_instr_key *loader_error_mutex_key;
+extern toku_instr_key *bfs_mutex_key;
+extern toku_instr_key *loader_bl_mutex_key;
+extern toku_instr_key *loader_fi_lock_mutex_key;
+extern toku_instr_key *loader_out_mutex_key;
+extern toku_instr_key *result_output_condition_lock_mutex_key;
+extern toku_instr_key *block_allocator_trace_lock_mutex_key;
+extern toku_instr_key *block_table_mutex_key;
+extern toku_instr_key *rollback_log_node_cache_mutex_key;
+extern toku_instr_key *txn_lock_mutex_key;
+extern toku_instr_key *txn_state_lock_mutex_key;
+extern toku_instr_key *txn_child_manager_mutex_key;
+extern toku_instr_key *txn_manager_lock_mutex_key;
+extern toku_instr_key *treenode_mutex_key;
+extern toku_instr_key *manager_mutex_key;
+extern toku_instr_key *manager_escalation_mutex_key;
+extern toku_instr_key *manager_escalator_mutex_key;
+extern toku_instr_key *db_txn_struct_i_txn_mutex_key;
+extern toku_instr_key *indexer_i_indexer_lock_mutex_key;
+extern toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
+extern toku_instr_key *locktree_request_info_mutex_key;
 
 // UNCONVERTED PART BELOW
 

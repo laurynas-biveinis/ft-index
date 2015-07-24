@@ -109,8 +109,6 @@ PATENT RIGHTS GRANT:
 #include "util/memarena.h"
 #include "util/omt.h"
 
-extern pfs_key_t log_internal_lock_mutex_key;
-
 using namespace toku;
 // Locking for the logger
 //  For most purposes we use the big ydb lock.
@@ -126,7 +124,7 @@ struct mylock {
 };
 
 static inline void ml_init(struct mylock *l) {
-    toku_mutex_init(log_internal_lock_mutex_key, &l->lock, 0);
+    toku_mutex_init(*log_internal_lock_mutex_key, &l->lock, 0);
 }
 static inline void ml_lock(struct mylock *l) {
     toku_mutex_lock(&l->lock);

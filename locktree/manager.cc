@@ -98,11 +98,7 @@ PATENT RIGHTS GRANT:
 
 #include <util/status.h>
 
-pfs_key_t manager_mutex_key;
-pfs_key_t manager_escalation_mutex_key;
-pfs_key_t manger_escalator_mutex_key;
 pfs_key_t manager_m_escalator_done_key;
-extern pfs_key_t treenode_mutex_key;
 
 namespace toku {
 
@@ -116,7 +112,7 @@ void locktree_manager::create(lt_create_cb create_cb, lt_destroy_cb destroy_cb, 
     m_lt_escalate_callback = escalate_cb;
     m_lt_escalate_callback_extra = escalate_extra;
     ZERO_STRUCT(m_mutex);
-    toku_mutex_init(manager_mutex_key, &m_mutex, nullptr);
+    toku_mutex_init(*manager_mutex_key, &m_mutex, nullptr);
 
     ZERO_STRUCT(status);
     ZERO_STRUCT(m_lt_counters);
@@ -405,7 +401,8 @@ int locktree_manager::check_current_lock_constraints(bool big_txn) {
 
 void locktree_manager::escalator_init(void) {
     ZERO_STRUCT(m_escalation_mutex);
-    toku_mutex_init(manager_escalation_mutex_key, &m_escalation_mutex, nullptr);
+    toku_mutex_init(*manager_escalation_mutex_key, &m_escalation_mutex,
+                    nullptr);
     m_escalation_count = 0;
     m_escalation_time = 0;
     m_wait_escalation_count = 0;
@@ -462,7 +459,7 @@ struct escalate_args {
 
 void locktree_manager::locktree_escalator::create(void) {
     ZERO_STRUCT(m_escalator_mutex);
-    toku_mutex_init(manger_escalator_mutex_key, &m_escalator_mutex, nullptr);
+    toku_mutex_init(*manager_escalator_mutex_key, &m_escalator_mutex, nullptr);
     toku_cond_init(manager_m_escalator_done_key, &m_escalator_done, nullptr);
     m_escalator_running = false;
 }

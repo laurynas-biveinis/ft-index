@@ -240,6 +240,16 @@ static FT_STATUS_S ft_status;
 #define STATUS_INIT(k,c,t,l,inc) TOKUFT_STATUS_INIT(ft_status, k, c, t, "ft: " l, inc)
 
 static toku_mutex_t ft_open_close_lock;
+static toku_instr_key *ft_open_close_lock_mutex_key;
+// TODO: not the cleanest module separation below
+toku_instr_key *treenode_mutex_key;
+toku_instr_key *locktree_request_info_mutex_key;
+toku_instr_key *manager_mutex_key;
+toku_instr_key *manager_escalation_mutex_key;
+toku_instr_key *manager_escalator_mutex_key;
+toku_instr_key *db_txn_struct_i_txn_mutex_key;
+toku_instr_key *indexer_i_indexer_lock_mutex_key;
+toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
 
 static toku_instr_key *fti_probe_1_key;
 static toku_instr_key *fti_probe_2_key;
@@ -254,41 +264,9 @@ toku_instr_probe *toku_instr_probe_4;
 #ifdef HAVE_PSI_INTERFACE
 
 //ft-index mutexes
-pfs_key_t ft_open_close_lock_mutex_key;
-extern pfs_key_t txn_manager_lock_mutex_key;
-extern pfs_key_t kibbutz_mutex_key;
-extern pfs_key_t ft_ref_lock_mutex_key;
-extern pfs_key_t txn_lock_mutex_key;
-extern pfs_key_t txn_state_lock_mutex_key;
-extern pfs_key_t rollback_log_node_cache_mutex_key;
-extern pfs_key_t txn_child_manager_mutex_key;
-extern pfs_key_t block_allocator_trace_lock_mutex_key;
-extern pfs_key_t block_table_mutex_key;
-extern pfs_key_t bjm_jobs_lock_mutex_key;  
-extern pfs_key_t checkpoint_safe_mutex_key;
-extern pfs_key_t bfs_mutex_key;
-extern pfs_key_t loader_error_mutex_key;
-extern pfs_key_t loader_bl_mutex_key;
-extern pfs_key_t loader_fi_lock_mutex_key;
-extern pfs_key_t loader_out_mutex_key;
-extern pfs_key_t result_output_condition_lock_mutex_key;
-extern pfs_key_t manager_mutex_key;
-extern pfs_key_t manager_escalation_mutex_key;
-extern pfs_key_t manger_escalator_mutex_key;
-extern pfs_key_t locktree_request_info_mutex_key; 
-extern pfs_key_t indexer_i_indexer_lock_mutex_key;
-extern pfs_key_t indexer_i_indexer_estimate_lock_mutex_key;
-extern pfs_key_t db_txn_struct_i_txn_mutex_key;
-extern pfs_key_t minicron_p_mutex_key;  
-extern pfs_key_t queue_result_mutex_key;
-extern pfs_key_t tpool_lock_mutex_key;  
 extern pfs_key_t cachetable_m_mutex_key;
-extern pfs_key_t cachetable_ev_thread_lock_mutex_key;
-extern pfs_key_t log_internal_lock_mutex_key;
-extern pfs_key_t workset_lock_mutex_key;
 extern pfs_key_t safe_file_size_lock_mutex_key;
 extern pfs_key_t cachetable_disk_nb_mutex_key;
-extern pfs_key_t treenode_mutex_key;
 extern pfs_key_t circular_buffer_m_lock_mutex_key;
 
 //condition vars
@@ -330,40 +308,9 @@ extern pfs_key_t cachetable_disk_nb_rwlock_key;
 //extern pfs_key_t fmutex_cond_key;   
 
 static PSI_mutex_info   all_ftindex_mutexes[] = {
-        {&txn_manager_lock_mutex_key, "txn_manager_lock_mutex", 0},
-        {&kibbutz_mutex_key, "kibbutz_mutex", 0},
-        {&ft_ref_lock_mutex_key, "ft_ref_lock_mutex", 0},
-        {&txn_lock_mutex_key, "txn_lock_mutex", 0},
-        {&txn_state_lock_mutex_key, "txn_state_lock_mutex", 0},
-        {&rollback_log_node_cache_mutex_key, "rollback_log_node_cache_mutex", 0},
-        {&txn_child_manager_mutex_key, "txn_child_manager_mutex", 0},
-        {&block_allocator_trace_lock_mutex_key, "block_allocator_trace_lock_mutex", 0},
-        {&block_table_mutex_key, "block_table_mutex", 0},
-        {&workset_lock_mutex_key, "workset_lock_mutex", 0},
-        {&log_internal_lock_mutex_key, "log_internal_lock_mutex", 0},
         {&circular_buffer_m_lock_mutex_key, "circular_buffer_m_lock_mutex", 0},
-        {&treenode_mutex_key, "treenode_mutex", 0},
-        {&ft_open_close_lock_mutex_key, "ft_open_close_lock_mutex", 0},
-        {&bjm_jobs_lock_mutex_key, "bjm_jobs_lock_mutex", 0},
-        {&checkpoint_safe_mutex_key, "checkpoint_safe_mutex", 0},
-        {&bfs_mutex_key, "bfs_mutex", 0},
-        {&loader_error_mutex_key, "loader_error_mutex", 0},
-        {&loader_bl_mutex_key, "loader_bl_mutex", 0},
-        {&loader_fi_lock_mutex_key, "loader_fi_lock_mutex", 0},
-        {&loader_out_mutex_key, "loader_out_mutex", 0},
-        {&result_output_condition_lock_mutex_key,"result_output_condition_lock_mutex", 0},
-        {&manager_mutex_key, "manager_mutex", 0},
-        {&manager_escalation_mutex_key, "manager_escalation_mutex", 0},
         {&manger_escalator_mutex_key, "manager_escalator_mutex", 0},   
-        {&locktree_request_info_mutex_key, "locktree_request_info_mutex", 0},
-        {&indexer_i_indexer_lock_mutex_key, "indexer_i_indexer_lock_mutex", 0},
-        {&indexer_i_indexer_estimate_lock_mutex_key,   "indexer_i_indexer_estimate_lock_mutex", 0},
-        {&db_txn_struct_i_txn_mutex_key, "db_txn_struct_i_txn_mutex", 0},
-        {&minicron_p_mutex_key, "minicron_p_mutex", 0},
-        {&queue_result_mutex_key, "queue_result_mutex", 0},
-        {&tpool_lock_mutex_key, "tpool_lock__mutex", 0},   
         {&cachetable_m_mutex_key, "cachetable_m_mutex", 0},
-        {&cachetable_ev_thread_lock_mutex_key, "cachetable_ev_thread_lock_mutex", 0},
         {&safe_file_size_lock_mutex_key,"safe_file_size_lock_mutex",0},
         {&cachetable_disk_nb_mutex_key,"cachetable_disk_nb_mutex",0},        
 };
@@ -4718,23 +4665,120 @@ int toku_ft_layer_init(void) {
     mysql_cond_register("fti", all_ftindex_conds, count);
 #endif
 
-    tokudb_file_data_key = new toku_instr_key(file, "fti", "tokudb_data_file");
-    tokudb_file_load_key = new toku_instr_key(file, "fti", "tokudb_load_file");
-    tokudb_file_tmp_key = new toku_instr_key(file, "fti", "tokudb_tmp_file");
-    tokudb_file_log_key = new toku_instr_key(file, "fti", "tokudb_log_file");
+    kibbutz_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                           "fti", "kibbutz_mutex");
+    minicron_p_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                              "fti", "minicron_p_mutex");
+    queue_result_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                                "fti", "queue_result_mutex");
+    tpool_lock_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                              "fti", "tpool_lock_mutex");
+    workset_lock_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                                 "fti", "workset_lock_mutex");
+    bjm_jobs_lock_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                                 "fti", "bjm_jobs_lock_mutex");
+    log_internal_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "log_internal_lock_mutex");
+    cachetable_ev_thread_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "cachetable_ev_thread_lock_mutex");
+    checkpoint_safe_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "checkpoint_safe_mutex");
+    ft_ref_lock_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                               "fti", "ft_ref_lock_mutex");
+    ft_open_close_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "ft_open_close_lock_mutex");
+    loader_error_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                                "fti", "loader_error_mutex");
+    bfs_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                       "fti", "bfs_mutex");
+    loader_bl_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                             "fti", "loader_bl_mutex");
+    loader_fi_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "loader_fi_lock_mutex");
+    loader_out_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                              "fti", "loader_out_mutex");
+    result_output_condition_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "result_output_condition_lock_mutex");
+    block_allocator_trace_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "block_allocator_trace_lock_mutex");
+    block_table_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                               "fti", "block_table_mutex");
+    rollback_log_node_cache_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "rollback_log_node_cache_mutex");
+    txn_lock_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                            "fti", "txn_lock_mutex");
+    txn_state_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "txn_state_lock_mutex");
+    txn_child_manager_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "txn_child_manager_mutex");
+    txn_manager_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "txn_manager_lock_mutex");
+    treenode_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                            "fti", "treenode_mutex");
+    locktree_request_info_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "locktree_request_info_mutex");
+    manager_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
+                                           "fti", "manager_mutex");
+    manager_escalation_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "manager_escalation_mutex");
+    manager_escalator_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex,
+                             "fti", "manager_escalator_mutex");
+    db_txn_struct_i_txn_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "db_txn_struct_i_txn_mutex");
+    indexer_i_indexer_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "indexer_i_indexer_lock_mutex");
+    indexer_i_indexer_estimate_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "indexer_i_indexer_estimate_lock_mutex");
 
-    fti_probe_1_key = new toku_instr_key(mutex, "fti", "fti_probe_1");
-    fti_probe_2_key = new toku_instr_key(mutex, "fti", "fti_probe_2");
-    fti_probe_3_key = new toku_instr_key(mutex, "fti", "fti_probe_3");
-    fti_probe_4_key = new toku_instr_key(mutex, "fti", "fti_probe_4");
+    tokudb_file_data_key = new toku_instr_key(toku_instr_object_type::file,
+                                              "fti", "tokudb_data_file");
+    tokudb_file_load_key = new toku_instr_key(toku_instr_object_type::file,
+                                              "fti", "tokudb_load_file");
+    tokudb_file_tmp_key = new toku_instr_key(toku_instr_object_type::file,
+                                             "fti", "tokudb_tmp_file");
+    tokudb_file_log_key = new toku_instr_key(toku_instr_object_type::file,
+                                             "fti", "tokudb_log_file");
 
-    extractor_thread_key = new toku_instr_key(thread, "fti", "extractor_thread");
-    fractal_thread_key = new toku_instr_key(thread, "fti", "fractal_thread");
-    io_thread_key = new toku_instr_key(thread, "fti", "io_thread");
-    eviction_thread_key = new toku_instr_key(thread, "fti", "eviction_thread");
-    kibbutz_thread_key = new toku_instr_key(thread, "fti", "kibbutz_thread");
-    minicron_thread_key = new toku_instr_key(thread, "fti", "minicron_thread");
-    tp_internal_thread_key = new toku_instr_key(thread, "fti", "tp_internal_thread");
+    fti_probe_1_key = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                                         "fti_probe_1");
+    fti_probe_2_key = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                                         "fti_probe_2");
+    fti_probe_3_key = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                                         "fti_probe_3");
+    fti_probe_4_key = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                                         "fti_probe_4");
+
+    extractor_thread_key = new toku_instr_key(toku_instr_object_type::thread,
+                                              "fti", "extractor_thread");
+    fractal_thread_key = new toku_instr_key(toku_instr_object_type::thread,
+                                            "fti", "fractal_thread");
+    io_thread_key = new toku_instr_key(toku_instr_object_type::thread, "fti",
+                                       "io_thread");
+    eviction_thread_key = new toku_instr_key(toku_instr_object_type::thread,
+                                             "fti", "eviction_thread");
+    kibbutz_thread_key = new toku_instr_key(toku_instr_object_type::thread,
+                                            "fti", "kibbutz_thread");
+    minicron_thread_key = new toku_instr_key(toku_instr_object_type::thread,
+                                             "fti", "minicron_thread");
+    tp_internal_thread_key = new toku_instr_key(toku_instr_object_type::thread,
+                                                 "fti", "tp_internal_thread");
 
     toku_instr_probe_1 = new toku_instr_probe(*fti_probe_1_key);
     toku_instr_probe_2 = new toku_instr_probe(*fti_probe_2_key);
@@ -4750,7 +4794,7 @@ int toku_ft_layer_init(void) {
     toku_ule_status_init();
     toku_checkpoint_init();
     toku_ft_serialize_layer_init();
-    toku_mutex_init(ft_open_close_lock_mutex_key, &ft_open_close_lock, NULL);
+    toku_mutex_init(*ft_open_close_lock_mutex_key, &ft_open_close_lock, NULL);
     toku_scoped_malloc_init();
 exit:
     return r;
@@ -4767,11 +4811,6 @@ void toku_ft_layer_destroy(void) {
     partitioned_counters_destroy();
     toku_scoped_malloc_destroy();
 
-#ifdef HAVE_PSI_MUTEX_INTERFACE
-    toku_mutex_destroy(&fti_probe_mutex_4);
-    toku_mutex_destroy(&fti_probe_mutex_3);    
-    toku_mutex_destroy(&fti_probe_mutex_2);
-#endif
     delete toku_instr_probe_1;
     delete toku_instr_probe_2;
     delete toku_instr_probe_3;

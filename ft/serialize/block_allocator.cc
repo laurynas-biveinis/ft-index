@@ -108,7 +108,7 @@ PATENT RIGHTS GRANT:
 #define VALIDATE()
 #endif
 
-pfs_key_t block_allocator_trace_lock_mutex_key;
+toku_instr_key *block_allocator_trace_lock_mutex_key;
 
 static TOKU_FILE *ba_trace_file = nullptr;
 
@@ -153,7 +153,8 @@ void block_allocator::_create_internal(uint64_t reserve_at_beginning, uint64_t a
     _strategy = BA_STRATEGY_FIRST_FIT;
 
     memset(&_trace_lock, 0, sizeof(toku_mutex_t));
-    toku_mutex_init(block_allocator_trace_lock_mutex_key, &_trace_lock, nullptr);
+    toku_mutex_init(*block_allocator_trace_lock_mutex_key, &_trace_lock,
+                    nullptr);
 
     VALIDATE();
 }

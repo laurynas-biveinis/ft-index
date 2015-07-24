@@ -95,7 +95,7 @@ PATENT RIGHTS GRANT:
 
 #include "cachetable/background_job_manager.h"
 
-pfs_key_t bjm_jobs_lock_mutex_key;
+toku_instr_key *bjm_jobs_lock_mutex_key;
 pfs_key_t bjm_jobs_wait_key; 
 
 struct background_job_manager_struct {
@@ -107,7 +107,7 @@ struct background_job_manager_struct {
 
 void bjm_init(BACKGROUND_JOB_MANAGER* pbjm) {
     BACKGROUND_JOB_MANAGER XCALLOC(bjm);
-    toku_mutex_init(bjm_jobs_lock_mutex_key, &bjm->jobs_lock, 0);    
+    toku_mutex_init(*bjm_jobs_lock_mutex_key, &bjm->jobs_lock, 0);
     toku_cond_init(bjm_jobs_wait_key,&bjm->jobs_wait, NULL);
     bjm->accepting_jobs = true;
     bjm->num_jobs = 0;

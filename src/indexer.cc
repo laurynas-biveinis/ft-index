@@ -109,9 +109,6 @@ PATENT RIGHTS GRANT:
 #include "loader.h"
 #include <util/status.h>
 
-pfs_key_t indexer_i_indexer_lock_mutex_key;
-pfs_key_t indexer_i_indexer_estimate_lock_mutex_key;
-
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
 //
@@ -312,8 +309,10 @@ toku_indexer_create_indexer(DB_ENV *env,
     indexer->close                 = close_indexer;
     indexer->abort                 = abort_indexer;
 
-    toku_mutex_init(indexer_i_indexer_lock_mutex_key, &indexer->i->indexer_lock, NULL);
-    toku_mutex_init(indexer_i_indexer_estimate_lock_mutex_key, &indexer->i->indexer_estimate_lock, NULL);
+    toku_mutex_init(*indexer_i_indexer_lock_mutex_key,
+                    &indexer->i->indexer_lock, nullptr);
+    toku_mutex_init(*indexer_i_indexer_estimate_lock_mutex_key,
+                    &indexer->i->indexer_estimate_lock, nullptr);
     toku_init_dbt(&indexer->i->position_estimate);
 
     //

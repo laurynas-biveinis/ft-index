@@ -94,7 +94,7 @@ PATENT RIGHTS GRANT:
 
 #include "txn/rollback_log_node_cache.h"
 
-pfs_key_t rollback_log_node_cache_mutex_key;
+toku_instr_key *rollback_log_node_cache_mutex_key;
 
 void rollback_log_node_cache::init (uint32_t max_num_avail_nodes) {
     XMALLOC_N(max_num_avail_nodes, m_avail_blocknums);
@@ -104,7 +104,7 @@ void rollback_log_node_cache::init (uint32_t max_num_avail_nodes) {
     toku_pthread_mutexattr_t attr;
     toku_mutexattr_init(&attr);
     toku_mutexattr_settype(&attr, TOKU_MUTEX_ADAPTIVE);
-    toku_mutex_init(rollback_log_node_cache_mutex_key, &m_mutex, &attr);
+    toku_mutex_init(*rollback_log_node_cache_mutex_key, &m_mutex, &attr);
     toku_mutexattr_destroy(&attr);
 }
 

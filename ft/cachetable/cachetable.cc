@@ -111,7 +111,7 @@ PATENT RIGHTS GRANT:
 #include "util/context.h"
 
 pfs_key_t cachetable_m_mutex_key;
-pfs_key_t cachetable_ev_thread_lock_mutex_key;
+toku_instr_key *cachetable_ev_thread_lock_mutex_key;
 
 pfs_key_t cachetable_m_list_lock_key;   
 pfs_key_t cachetable_m_pending_lock_expensive_key;
@@ -126,7 +126,7 @@ pfs_key_t cachetable_p_refcount_wait_key;
 pfs_key_t cachetable_m_flow_control_cond_key;
 pfs_key_t cachetable_m_ev_thread_cond_key;
 
-pfs_key_t log_internal_lock_mutex_key;
+toku_instr_key *log_internal_lock_mutex_key;
 toku_instr_key *eviction_thread_key;
 
 ///////////////////////////////////////////////////////////////////////////////////
@@ -3294,7 +3294,7 @@ void pair_list::init() {
 #ifdef TOKU_PFS_MUTEX_EXTENDED_CACHETABLEMMUTEX
         toku_mutex_init(cachetable_m_mutex_key, &m_mutexes[i].aligned_mutex, NULL);
 #else
-        toku_mutex_init(PFS_NOT_INSTRUMENTED, &m_mutexes[i].aligned_mutex, NULL);
+        toku_mutex_init(toku_uninstrumented, &m_mutexes[i].aligned_mutex, NULL);
 #endif
     }
 }
@@ -3685,7 +3685,7 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_pl = _pl;
     m_cf_list = _cf_list;
     m_kibbutz = _kibbutz;    
-    toku_mutex_init(cachetable_ev_thread_lock_mutex_key, &m_ev_thread_lock, NULL);
+    toku_mutex_init(*cachetable_ev_thread_lock_mutex_key, &m_ev_thread_lock, NULL);
     toku_cond_init(cachetable_m_flow_control_cond_key,&m_flow_control_cond, NULL);
     toku_cond_init(cachetable_m_ev_thread_cond_key,&m_ev_thread_cond, NULL);
     m_num_sleepers = 0;    
