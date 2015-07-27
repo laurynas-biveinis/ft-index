@@ -157,11 +157,11 @@ void toku_instr_file_name_close_begin(toku_io_instrumentation &io_instr,
 
 inline
 void toku_instr_file_stream_close_begin(toku_io_instrumentation &io_instr,
-                                toku_instr_file_op op, TOKU_FILE *file, 
+                                toku_instr_file_op op, TOKU_FILE &file,
                                 const char *src_file, int src_line)
 {
     io_instr.locker = PSI_FILE_CALL(get_thread_file_stream_locker)
-        (&io_instr.state, file->key, (PSI_file_operation) op); 
+        (&io_instr.state, file.key, (PSI_file_operation) op);
     if (toku_likely(io_instr.locker)) {
         PSI_FILE_CALL(start_file_close_wait)(io_instr.locker,
                                             src_file, src_line);
@@ -221,12 +221,12 @@ void toku_instr_file_name_io_begin(toku_io_instrumentation &io_instr,
 
 inline
 void toku_instr_file_stream_io_begin(toku_io_instrumentation &io_instr,
-                                toku_instr_file_op op, TOKU_FILE * file, 
+                                toku_instr_file_op op, TOKU_FILE &file,
                                 ssize_t count,
                                 const char *src_file, int src_line)
 {
     io_instr.locker = PSI_FILE_CALL(get_thread_file_stream_locker)
-        (&io_instr.state, file->key, (PSI_file_operation) op); 
+        (&io_instr.state, file.key, (PSI_file_operation) op); 
     if (toku_likely(io_instr.locker)) {
         PSI_FILE_CALL(start_file_wait)(io_instr.locker, count,
                                             src_file, src_line);

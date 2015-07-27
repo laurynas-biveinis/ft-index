@@ -46,7 +46,9 @@ public:
 
 typedef toku_instr_probe_empty toku_instr_probe;
 
-enum class toku_instr_file_op { fopen, create, open };
+enum class toku_instr_file_op { file_stream_open, file_create, file_open,
+        file_delete, file_read, file_write, file_sync, file_stream_close,
+        file_close };
 
 struct PSI_file { };
 struct PSI_mutex { };
@@ -129,7 +131,7 @@ void toku_instr_file_name_io_begin(UU(toku_io_instrumentation &io_instr),
                                 UU(toku_instr_file_op op),
                                 UU(const char *name),
                                 UU(unsigned int count),
-                                UU(const char *src_file), int src_line))
+                                UU(const char *src_file), UU(int src_line))
 {
 }
 
@@ -137,7 +139,7 @@ inline
 void toku_instr_file_stream_io_begin(UU(toku_io_instrumentation &io_instr),
                                 UU(toku_instr_file_op op), UU(TOKU_FILE &file), 
                                 UU(unsigned int count),
-                                UU(const char *src_file, UU(int src_line))
+                                UU(const char *src_file), UU(int src_line))
 {
 }
 

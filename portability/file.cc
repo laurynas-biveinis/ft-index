@@ -413,8 +413,8 @@ toku_os_fwrite_with_source_location (const void *ptr, size_t size, size_t nmemb,
 
     toku_io_instrumentation io_annotation;
     toku_instr_file_stream_io_begin(io_annotation, toku_instr_file_op::file_write,
-                                             stream , nmemb, src_file, src_line);
-                                              
+                                    *stream , nmemb, src_file, src_line);
+
     if (os_fwrite_fun) {
         bytes_written= os_fwrite_fun(ptr, size, nmemb, stream->file);
     } else {
@@ -445,7 +445,7 @@ toku_os_fread_with_source_location(void *ptr, size_t size, size_t nmemb, TOKU_FI
 
     toku_io_instrumentation io_annotation;
     toku_instr_file_stream_io_begin(io_annotation, toku_instr_file_op::file_read,
-                                             stream , nmemb, src_file, src_line);
+                                    *stream , nmemb, src_file, src_line);
 
     if ((bytes_read= fread(ptr, size, nmemb, stream->file)) != nmemb) {
         if ((feof(stream->file))) 
@@ -462,8 +462,8 @@ toku_os_fread_with_source_location(void *ptr, size_t size, size_t nmemb, TOKU_FI
 }
 
 
-TOKU_FILE * 
-inline_toku_os_fdopen(int fildes, const char *mode) 
+TOKU_FILE *
+toku_os_fdopen(int fildes, const char *mode)
 {
     //TOKU_FILE * rval;
     TOKU_FILE *XMALLOC(rval);
@@ -494,7 +494,7 @@ toku_os_fopen_with_source_location(const char *filename, const char *mode,
 
     toku_io_instrumentation io_annotation;
     toku_instr_file_open_begin(io_annotation, instr_key,
-                               toku_instr_file_op::file_stream_open, 
+                               toku_instr_file_op::file_stream_open,
                                filename, src_file, src_line);
     rval->file = t_fopen ? t_fopen(filename, mode) : fopen(filename, mode);
     /* Register the returning "file" value with the system */
@@ -563,7 +563,7 @@ toku_os_fclose_with_source_location(TOKU_FILE * stream,
         toku_io_instrumentation io_annotation;
         toku_instr_file_stream_close_begin(io_annotation, 
                                        toku_instr_file_op::file_stream_close,
-                                       stream, src_file, src_line);
+                                       *stream, src_file, src_line);
                                                                        
         if (t_fclose)
         	rval = t_fclose(stream->file);
@@ -617,8 +617,7 @@ toku_os_read_with_source_location(int fd, void *buf, size_t count,
     toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_read,
                              fd, count, src_file, src_line);
 
-    if (t_read)
-        bytes_read = (t_read) ? t_read(fd, buf, count): read(fd, buf, count);
+    bytes_read = (t_read) ? t_read(fd, buf, count): read(fd, buf, count);
 
     toku_instr_file_io_end(io_annotation, bytes_read);
 
