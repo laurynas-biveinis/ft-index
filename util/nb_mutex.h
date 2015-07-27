@@ -107,12 +107,12 @@ extern pfs_key_t nb_mutex_key;
 typedef struct nb_mutex *NB_MUTEX;
 struct nb_mutex {
     struct st_rwlock lock;
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH)
     toku_mutex_t toku_mutex;
 #endif
 };
 
-#if defined(HAVE_PSI_RWLOCK_INTERFACE) && (defined(TOKU_PFS_EXTENDED_NBMUTEXH) || defined(TOKU_PFS_EXTENDED_RWLOCKH))
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH) || defined(TOKU_PFS_EXTENDED_RWLOCKH)
 #  if defined(TOKU_PFS_EXTENDED_NBMUTEXH) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
 #    define nb_mutex_init(MK, RK, M) \
       inline_nb_mutex_init(MK, RK, M)
@@ -129,65 +129,53 @@ struct nb_mutex {
 #endif
 
 // initialize an nb mutex
-static __attribute__((__unused__))
+inline
 void
 inline_nb_mutex_init(
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
- PSI_mutex_key mutex_psi_key,
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH)
+ const toku_instr_key &mutex_instr_key,
 #endif
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_RWLOCKH)
- PSI_rwlock_key rwlock_psi_key,
+#if defined(TOKU_PFS_EXTENDED_RWLOCKH)
+ const toku_instr_key &rwlock_instr_key,
 #endif
  NB_MUTEX nb_mutex) {
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
-    toku_mutex_init(mutex_psi_key, &nb_mutex->toku_mutex, NULL);
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH)
+    toku_mutex_init(mutex_instr_key, &nb_mutex->toku_mutex, NULL);
 #endif
-    rwlock_init(rwlock_psi_key, &nb_mutex->lock);
+    rwlock_init(rwlock_instr_key, &nb_mutex->lock);
 }
 
 // destroy a read write lock
-static __attribute__((__unused__))
+inline
 void
 nb_mutex_destroy(NB_MUTEX nb_mutex) {
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
-  if (nb_mutex->toku_mutex.psi_mutex != NULL)
-  {
-    PSI_MUTEX_CALL(destroy_mutex)(nb_mutex->toku_mutex.psi_mutex);
-    nb_mutex->toku_mutex.psi_mutex= NULL;
-  }
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH)
+    toku_instr_mutex_destroy(nb_mutex->toku_mutex.psi_mutex);
 #endif
     rwlock_destroy(&nb_mutex->lock);
 }
 
 // obtain a write lock
 // expects: mutex is locked
-static inline void nb_mutex_lock(NB_MUTEX nb_mutex, toku_mutex_t *mutex) {
- 
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
-  PSI_mutex_locker *locker=NULL;  
-  PSI_mutex_locker_state state;
-  if (nb_mutex->toku_mutex.psi_mutex != NULL)
-  {
-    /* Instrumentation start */
-    locker= PSI_MUTEX_CALL(start_mutex_wait)(&state, nb_mutex->toku_mutex.psi_mutex,
-                                       PSI_MUTEX_LOCK, __FILE__, __LINE__);
-  }
-#endif 
+inline
+void nb_mutex_lock(NB_MUTEX nb_mutex, toku_mutex_t *mutex) {
+#ifdef TOKU_PFS_EXTENDED_NBMUTEXH
+    toku_mutex_instrumentation mutex_instr;
+    toku_instr_mutex_lock_start(mutex_instr, *mutex, __FILE__, __LINE__); // TODO: pull these to caller?
+#endif
     rwlock_write_lock(&nb_mutex->lock, mutex);
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
-  /* Instrumentation end */
-  if (nb_mutex->toku_mutex.psi_mutex != NULL && locker != NULL)
-      PSI_MUTEX_CALL(end_mutex_wait)(locker, 0);
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH)
+    toku_instr_mutex_lock_end(mutex_instr, 0);
 #endif
 }
 
 // release a write lock
 // expects: mutex is locked
 
-static inline void nb_mutex_unlock(NB_MUTEX nb_mutex) {
-#if defined(HAVE_PSI_MUTEX_INTERFACE) && defined(TOKU_PFS_EXTENDED_NBMUTEXH)
-if (nb_mutex->toku_mutex.psi_mutex != NULL)  
-     PSI_MUTEX_CALL(unlock_mutex)(nb_mutex->toku_mutex.psi_mutex);
+inline
+void nb_mutex_unlock(NB_MUTEX nb_mutex) {
+#if defined(TOKU_PFS_EXTENDED_NBMUTEXH)
+    toku_instr_mutex_unlock(nb_mutex->toku_mutex.psi_mutex);
 #endif
     rwlock_write_unlock(&nb_mutex->lock);
 }

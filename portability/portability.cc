@@ -226,22 +226,17 @@ toku_os_get_file_size_with_source_location(int fildes, int64_t *fsize,
                                            const char *src_file,
                                            uint src_line) {
     toku_struct_stat sbuf;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;
-    register_pfs_file_io_begin(&state, locker, fildes, 0,
-                               PSI_FILE_FSTAT, src_file, src_line);
-#else
-    (void) src_file;
-    (void) src_line;
-#endif
+
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_stat,
+                                     fildes, 0, src_file, src_line);
+                                     
     int r = fstat(fildes, &sbuf);
     if (r==0) {
         *fsize = sbuf.st_size;
     }
-#ifdef HAVE_PSI_FILE_INTERFACE
-    register_pfs_file_io_end(locker, 0);
-#endif
+    toku_instr_file_io_end(io_annotation, 0);
+    
     return r;
 }
 
@@ -339,39 +334,25 @@ int
 toku_stat_with_source_location(const char *name, toku_struct_stat *buf,
                                const toku_instr_key &instr_key,
                                const char *src_file, uint src_line) {
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;
-    register_pfs_file_name_io_begin(&state, locker, instr_key.id(), name, 0,
-                               PSI_FILE_STAT, src_file, src_line);
-#else
-    (void) instr_key; // The #else part will go away once the PFS conversion is completed
-    (void) src_file;
-    (void) src_line;
-#endif
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_name_io_begin(io_annotation,instr_key, toku_instr_file_op::file_stat,
+                                     name, 0, src_file, src_line);
     int r = stat(name, buf);
-#ifdef HAVE_PSI_FILE_INTERFACE
-    register_pfs_file_io_end(locker, 0);
-#endif
+
+    toku_instr_file_io_end(io_annotation, 0);
     return r;
 }
 
 int
-toku_os_fstat(int fd, toku_struct_stat *buf,
-              const char *src_file, uint src_line) {
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;
-    register_pfs_file_io_begin(&state, locker, fd, 0,
-                               PSI_FILE_FSTAT, src_file, src_line);
-#else
-    (void) src_file;
-    (void) src_line;
-#endif
+toku_os_fstat_with_source_location(int fd, toku_struct_stat *buf,
+                                   const char *src_file, uint src_line) 
+{
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_stat,
+                                     fd, 0, src_file, src_line);
+
     int r = fstat(fd, buf);
-#ifdef HAVE_PSI_FILE_INTERFACE
-    register_pfs_file_io_end(locker, 0);
-#endif
+    toku_instr_file_io_end(io_annotation, 0);
     return r;
 }
 

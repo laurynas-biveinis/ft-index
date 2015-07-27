@@ -7,6 +7,9 @@
 #ifndef HAVE_PSI_MUTEX_INTERFACE
 #error HAVE_PSI_MUTEX_INTERFACE required
 #endif
+#ifndef HAVE_PSI_RWLOCK_INTERFACE
+#error HAVE_PSI_RWLOCK_INTERFACE required
+#endif
 #ifndef HAVE_PSI_THREAD_INTERFACE
 #error HAVE_PSI_THREAD_INTERFACE required
 #endif
@@ -97,6 +100,7 @@ enum class toku_instr_file_op {
     file_sync = PSI_FILE_SYNC,
     file_stream_close = PSI_FILE_STREAM_CLOSE,
     file_close = PSI_FILE_CLOSE,
+    file_stat = PSI_FILE_STAT,    
 };
 
 struct toku_io_instrumentation

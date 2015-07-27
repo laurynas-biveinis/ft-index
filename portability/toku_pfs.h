@@ -81,7 +81,7 @@ typedef toku_instr_probe_empty toku_instr_probe;
 
 enum class toku_instr_file_op { file_stream_open, file_create, file_open,
         file_delete, file_read, file_write, file_sync, file_stream_close,
-        file_close };
+        file_close, file_stat };
 
 struct PSI_file { };
 struct PSI_mutex { };

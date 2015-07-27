@@ -454,8 +454,13 @@ int toku_stat_with_source_location(const char *name, toku_struct_stat *buf,
 #define toku_stat(N, B, K) \
     toku_stat_with_source_location(N, B, K, __FILE__, __LINE__)
 
-int toku_os_fstat(int fd, toku_struct_stat *buf,
-                  const char *src_file, uint src_line);
+int
+toku_os_fstat_with_source_location(int fd, toku_struct_stat *buf,
+                                   const char *src_file, uint src_line)
+    __attribute__((__visibility__("default")));
+
+#define toku_os_fstat(FD, B) \
+    toku_os_fstat_with_source_location(FD, B, __FILE__, __LINE__)
 
 #ifdef HAVE_PSI_FILE_INTERFACE2
 int inline_toku_os_close(int fd, const char *src_file, uint src_line);
