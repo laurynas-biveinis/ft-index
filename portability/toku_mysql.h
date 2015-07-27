@@ -4,8 +4,6 @@
 #include <mysql/psi/mysql_file.h> // PSI_file
 #include <mysql/psi/mysql_thread.h> // PSI_mutex
 
-#include "toku_pthread.h"
-
 #ifndef HAVE_PSI_MUTEX_INTERFACE
 #error HAVE_PSI_MUTEX_INTERFACE required
 #endif
@@ -255,13 +253,13 @@ struct toku_mutex_instrumentation
 
 inline
 PSI_mutex* toku_instr_mutex_init(const toku_instr_key &key,
-                                 const toku_mutex_t &mutex)
+                                 toku_mutex_t &mutex)
 {
     return PSI_MUTEX_CALL(init_mutex)(key.id(), &mutex.pmutex);
 #if TOKU_PTHREAD_DEBUG
     mutex.instr_key_id = key.id();
-    if (key != PFS_NOT_INSTRUMENTED && mutex->psi_mutex == NULL )
-        fprintf(stderr,"initing tokudb mutex: key: %d NULL\n", key);
+    if (key.id() != PFS_NOT_INSTRUMENTED && mutex.psi_mutex == NULL )
+        fprintf(stderr,"initing tokudb mutex: key: %d NULL\n", key.id());
 #endif
 }
 
@@ -280,14 +278,15 @@ void toku_instr_mutex_lock_start(toku_mutex_instrumentation &mutex_instr,
                                  toku_mutex_t &mutex,
                                  const char *src_file, int src_line)
 {
-    if (mutex->psi_mutex)
+    if (mutex.psi_mutex)
     {
         mutex_instr.locker = PSI_MUTEX_CALL(start_mutex_wait)
-            (&state, mutex.psi_mutex, PSI_MUTEX_LOCK, src_file, src_line);
+            (&mutex_instr.state, mutex.psi_mutex, PSI_MUTEX_LOCK,
+             src_file, src_line);
 #if TOKU_PTHREAD_DEBUG
         if (!mutex_instr.locker)
             fprintf(stderr, "Can't start timer for mutex key: %d\n",
-                    mutex->instr_key_id);
+                    mutex.instr_key_id);
 #endif
     }
 }
@@ -297,10 +296,10 @@ void toku_instr_mutex_trylock_start(toku_mutex_instrumentation &mutex_instr,
                                     toku_mutex_t &mutex,
                                     const char *src_file, int src_line)
 {
-    if (mutex->psi_mutex)
+    if (mutex.psi_mutex)
         {
             mutex_instr.locker = PSI_MUTEX_CALL(start_mutex_wait)
-                (&state, mutex.psi_mutex, PSI_MUTEX_TRYLOCK,
+                (&mutex_instr.state, mutex.psi_mutex, PSI_MUTEX_TRYLOCK,
                  src_file, src_line);
         }
 }
@@ -310,7 +309,8 @@ void toku_instr_mutex_lock_end(toku_mutex_instrumentation &mutex_instr,
                                int pthread_mutex_lock_result)
 {
     if (mutex_instr.locker)
-        PSI_MUTEX_CALL(end_mutex_wait)(locker, pthread_mutex_lock_result);
+        PSI_MUTEX_CALL(end_mutex_wait)(mutex_instr.locker,
+                                       pthread_mutex_lock_result);
 }
 
 inline
@@ -330,7 +330,7 @@ class toku_instr_probe_pfs
  public:
     explicit toku_instr_probe_pfs(const toku_instr_key &key)
     {
-        toku_mutex_init(key.id(), &mutex, nullptr);
+        toku_mutex_init(key, &mutex, nullptr);
     }
 
     ~toku_instr_probe_pfs()

@@ -98,24 +98,9 @@ PATENT RIGHTS GRANT:
 #include "toku_portability.h"
 #include "toku_assert.h"
 
-//#ifdef MYSQL_TOKUDB_ENGINE
-# include <toku_pfs.h>
-//#endif
-
-inline
-void toku_instr_mutex_unlock(PSI_mutex *mutex_instr);
-
-inline
-PSI_mutex* toku_instr_mutex_init(const toku_instr_key &key,
-                                 const toku_mutex_t &mutex);
-                                 
-
-
-
-
+// TODO: some things moved toku_pfs.h, not necessarily the best place
 typedef pthread_attr_t toku_pthread_attr_t;
 typedef pthread_t toku_pthread_t;
-typedef pthread_mutexattr_t toku_pthread_mutexattr_t;
 typedef pthread_mutex_t toku_pthread_mutex_t;
 typedef pthread_condattr_t toku_pthread_condattr_t;
 typedef pthread_cond_t toku_pthread_cond_t;
@@ -132,20 +117,6 @@ typedef struct timespec toku_timespec_t;
 #ifndef TOKU_PTHREAD_DEBUG
 # define TOKU_PTHREAD_DEBUG 0
 #endif
-
-struct toku_mutex_t {
-    pthread_mutex_t pmutex;
-#if TOKU_PTHREAD_DEBUG
-    pthread_t owner; // = pthread_self(); // for debugging
-    bool locked;
-    bool valid;
-#endif
-
-    struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
-#if TOKU_PTHREAD_DEBUG
-    pfs_key_t instr_key_id;
-#endif
-};
 
 typedef struct toku_mutex_aligned {
     toku_mutex_t aligned_mutex __attribute__((__aligned__(64)));

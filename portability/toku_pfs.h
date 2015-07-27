@@ -2,6 +2,10 @@
 
 #include <stdio.h> // FILE
 
+// TODO: this define disappears after the source is fully converted to
+// toku_uninstrumented
+#define PFS_NOT_INSTRUMENTED           0xFFFFFFFF
+
 enum class toku_instr_object_type { mutex, rwlock, cond, thread, file };
 
 struct PSI_file;
@@ -13,7 +17,34 @@ struct TOKU_FILE
     struct PSI_file * key;
 };
 
+struct PSI_mutex;
+
+struct toku_mutex_t {
+    pthread_mutex_t pmutex;
+#if TOKU_PTHREAD_DEBUG
+    pthread_t owner; // = pthread_self(); // for debugging
+    bool locked;
+    bool valid;
+#endif
+
+    struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
+#if TOKU_PTHREAD_DEBUG
+    pfs_key_t instr_key_id;
+#endif
+};
+
 class toku_instr_key;
+
+// TODO: break this include loop
+#include <pthread.h>
+typedef pthread_mutexattr_t toku_pthread_mutexattr_t;
+
+inline
+void toku_mutex_init(const toku_instr_key &key, toku_mutex_t *mutex,
+                     const toku_pthread_mutexattr_t *attr);
+
+inline
+void toku_mutex_destroy(toku_mutex_t *mutex);
 
 class toku_instr_probe_empty
 {
@@ -156,7 +187,7 @@ struct toku_mutex_instrumentation { };
 
 inline
 PSI_mutex* toku_instr_mutex_init(UU(const toku_instr_key &key),
-                                 UU(const toku_mutex_t &mutex))
+                                 UU(toku_mutex_t &mutex))
 {
     return nullptr;
 }
@@ -192,11 +223,7 @@ void toku_instr_mutex_unlock(UU(PSI_mutex *mutex_instr))
 }
 
 #else // MYSQL_TOKUDB_ENGINE
-
 #include <toku_mysql.h>
-// # include <my_pthread.h>
-// # include <mysql/plugin.h>
-
 #endif // MYSQL_TOKUDB_ENGINE
 
 extern toku_instr_key toku_uninstrumented;
@@ -250,8 +277,4 @@ extern toku_instr_key *db_txn_struct_i_txn_mutex_key;
 extern toku_instr_key *indexer_i_indexer_lock_mutex_key;
 extern toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
 extern toku_instr_key *locktree_request_info_mutex_key;
-
-// UNCONVERTED PART BELOW
-
-#define PFS_NOT_INSTRUMENTED           0xFFFFFFFF
 
