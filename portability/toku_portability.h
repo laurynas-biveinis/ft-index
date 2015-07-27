@@ -273,8 +273,8 @@ extern void *realloc(void*, size_t)            __THROW __attribute__((__deprecat
 #define __builtin_expect(x, expected_value) (x)
 #endif
 
-#define toku_likely(x)   __builtin_expect((x),1)
-#define toku_unlikely(x) __builtin_expect((x),0)
+#define toku_likely(x)   __builtin_expect(!!(x),1)
+#define toku_unlikely(x) __builtin_expect(!!(x),0)
 
 void *os_malloc(size_t) __attribute__((__visibility__("default")));
 // Effect: See man malloc(2)
@@ -322,7 +322,12 @@ size_t toku_os_fwrite (const void *ptr, size_t size, size_t nmemb, TOKU_FILE *st
 size_t toku_os_fread (const void *ptr, size_t size, size_t nmemb, TOKU_FILE *stream);
 */
 
-TOKU_FILE * inline_toku_os_fdopen(int fildes, const char *mode);
+inline
+void toku_instr_mutex_unlock(PSI_mutex *mutex_instr);
+
+
+
+//TOKU_FILE * toku_os_fdopen(int fildes, const char *mode);
 void toku_os_recursive_delete(const char *path);
 
 TOKU_FILE * toku_os_fopen_with_source_location(const char *filename,
@@ -343,7 +348,102 @@ int toku_os_open_with_source_location(const char *path, int oflag, int mode,
 int toku_os_open_direct(const char *path, int oflag, int mode,
                         const toku_instr_key &instr_key);
 
-#ifdef HAVE_PSI_FILE_INTERFACE
+int
+toku_os_delete_with_source_location(const char *name,
+                                    const char *src_file, uint src_line);
+#define toku_os_delete(FN) \
+    toku_os_delete_with_source_location(FN, __FILE__, __LINE__) 
+                                    
+void
+toku_os_full_write_with_source_location(int fd, const void *buf, size_t len,
+                   const char *src_file, uint src_line);
+#define toku_os_full_write(FD, B, L) \
+     toku_os_full_write_with_source_location(FD, B, L, __FILE__, __LINE__)
+                                                       
+int
+toku_os_write_with_source_location(int fd, const void *buf, size_t len,
+                                   const char *src_file, uint src_line);
+#define toku_os_write(FD, B, L) \
+    toku_os_write_with_source_location(FD, B, L, __FILE__, __LINE__)
+
+void
+toku_os_full_pwrite_with_source_location(int fd, const void *buf, size_t len,
+                                         toku_off_t off,
+                                         const char *src_file, uint src_line);
+#define toku_os_full_pwrite(FD, B, L, O) \
+     toku_os_full_pwrite_with_source_location(FD, B, L, O, __FILE__, __LINE__)
+
+                                                                                                                     
+ssize_t 
+toku_os_pwrite_with_source_location(int fd, const void *buf, 
+                                    size_t len, toku_off_t off,
+                                    const char *src_file, 
+                                    uint src_line);
+
+#define toku_os_pwrite(FD, B, L, O) \
+        toku_os_pwrite_with_source_location(FD, B, L, O, __FILE__, __LINE__)
+
+
+int
+toku_os_fwrite_with_source_location (const void *ptr, size_t size, size_t nmemb,
+                                     TOKU_FILE *stream, 
+                                     const char *src_file, uint src_line);
+
+#define toku_os_fwrite(P, S, N, FS) \
+        toku_os_fwrite_with_source_location(P, S, N, FS, __FILE__, __LINE__)
+                       
+int
+toku_os_fread_with_source_location(void *ptr, size_t size, size_t nmemb, 
+                                   TOKU_FILE *stream,
+                                   const char *src_file, uint src_line);
+#define toku_os_fread(P, S, N, FS) \
+        toku_os_fread_with_source_location(P, S, N, FS, __FILE__, __LINE__)
+
+TOKU_FILE *
+toku_os_fopen_with_source_location(const char *filename, const char *mode,
+                                   const toku_instr_key &instr_key,
+                                   const char *src_file, uint src_line);
+
+#define toku_os_fdopen(FD, M, K) \
+   inline_toku_os_fdopen(FD, M)
+
+int
+toku_os_fclose_with_source_location(TOKU_FILE * stream,
+                                    const char *src_file, uint src_line);
+
+#define toku_os_fclose(FS) \
+        toku_os_fclose_with_source_location(FS, __FILE__, __LINE__)
+
+int 
+toku_os_close_with_source_location(int fd, const char *src_file, uint src_line);
+#define toku_os_close(FD) \
+        toku_os_close_with_source_location(FD, __FILE__, __LINE__)
+
+ssize_t
+toku_os_read_with_source_location(int fd, void *buf, size_t count,
+                                  const char *src_file, uint src_line);
+
+#define toku_os_read(FD, B, C) \
+        toku_os_read_with_source_location(FD, B, C,  __FILE__, __LINE__);
+        
+ssize_t
+inline_toku_os_pread_with_source_location(int fd, void *buf, size_t count,
+                                          off_t offset, const char *src_file,
+                                          uint src_line);
+#define toku_os_pread(FD, B, C, O) \
+        inline_toku_os_pread_with_source_location(FD, B, C, O, __FILE__, __LINE__);
+
+
+void file_fsync_internal_with_source_location(int fd,              
+                                const char *src_file, uint src_line);
+                                                                                                                                   
+#define file_fsync_internal(FD) \
+        file_fsync_internal_with_source_location(FD,  __FILE__, __LINE__);
+
+
+
+
+#ifdef HAVE_PSI_FILE_INTERFACE2
 int inline_toku_os_close(int fd, const char *src_file, uint src_line);
 int inline_toku_os_fclose(TOKU_FILE * stream, const char *src_file, uint src_line);
 ssize_t inline_toku_os_read(int fd, void *buf, size_t count, const char *src_file, uint src_line);
@@ -358,7 +458,7 @@ int inline_toku_os_get_file_size(int fildes, int64_t *fsize, const char *src_fil
 int inline_toku_os_stat(const char *name, toku_struct_stat *buf, pfs_key_t pfs_key, const char *src_file, uint src_line);
 int inline_toku_os_fstat(int fd, toku_struct_stat *buf, const char *src_file, uint src_line);
 int inline_toku_os_delete(const char *name, const char *srv_file, uint src_line);
-#else
+//#else
 int inline_toku_os_close(int fd);
 int inline_toku_os_fclose(TOKU_FILE * stream);
 ssize_t inline_toku_os_read(int fd, void *buf, size_t count);
@@ -374,112 +474,6 @@ int inline_toku_os_stat(const char *name, toku_struct_stat *buf);
 int inline_toku_os_fstat(int fd, toku_struct_stat *buf);
 int inline_toku_os_delete(const char *name);
 #endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_delete(FN) \
-    inline_toku_os_delete(FN, __FILE__, __LINE__)
-#else
-  #define toku_os_delete(FN) \
-    inline_toku_os_delete(FN)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_full_write(FD, B, L) \
-    inline_toku_os_full_write(FD, B, L, __FILE__, __LINE__)
-#else
-  #define toku_os_full_write(FD, B, L) \
-    inline_toku_os_full_write(FD, B, L)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_write(FD, B, L) \
-    inline_toku_os_write(FD, B, L, __FILE__, __LINE__)
-#else
-  #define toku_os_write(FD, B, L) \
-    inline_toku_os_write(FD, B, L)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_full_pwrite(FD, B, L, O) \
-    inline_toku_os_full_pwrite(FD, B, L, O, __FILE__, __LINE__)
-#else
-  #define toku_os_full_pwrite(FD, B, L, O) \
-    inline_toku_os_full_pwrite(FD, B, L, O)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_pwrite(FD, B, L, O) \
-    inline_toku_os_pwrite(FD, B, L, O, __FILE__, __LINE__)
-#else
-  #define toku_os_pwrite(FD, B, L, O) \
-    inline_toku_os_pwrite(FD, B, L, O)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_fwrite(P, S, N, FS) \
-    inline_toku_os_fwrite(P, S, N, FS, __FILE__, __LINE__)
-#else
-  #define toku_os_fwrite(P, S, N, FS) \
-    inline_toku_os_fwrite(P, S, N, FS)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_fread(P, S, N, FS) \
-    inline_toku_os_fread(P, S, N, FS, __FILE__, __LINE__)
-#else
-  #define toku_os_fread(P, S, N, FS) \
-    inline_toku_os_fread(P, S, N, FS)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_fdopen(FD, M, K) \
-    inline_toku_os_fdopen(FD, M)
-//    inline_toku_os_fdopen(FD, M, K, __FILE__, __LINE__)
-#else
-  #define toku_os_fdopen(FD, M, K) \
-    inline_toku_os_fdopen(FD, M)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_fclose(FS) \
-    inline_toku_os_fclose(FS, __FILE__, __LINE__)
-#else
-  #define toku_os_fclose(FS) \
-    inline_toku_os_fclose(FS)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_close(FD) \
-    inline_toku_os_close(FD, __FILE__, __LINE__)
-#else
-  #define toku_os_close(FD) \
-    inline_toku_os_close(FD)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_read(FD, B, C) \
-    inline_toku_os_read(FD, B, C,  __FILE__, __LINE__)
-#else
-  #define toku_os_read(FD, B, C) \
-    inline_toku_os_read(FD, B, C)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define toku_os_pread(FD, B, C, O) \
-    inline_toku_os_pread(FD, B, C, O, __FILE__, __LINE__)
-#else
-  #define toku_os_pread(FD, B, C, O) \
-    inline_toku_os_pread(FD, B, C, O)
-#endif
-
-#ifdef HAVE_PSI_FILE_INTERFACE
-  #define file_fsync_internal(FD) \
-    inline_file_fsync_internal(FD, __FILE__, __LINE__)
-#else
-  #define file_fsync_internal(FD) \
-    inline_file_fsync_internal(FD)
-#endif
-
 
 
 #ifdef HAVE_PSI_FILE_INTERFACE

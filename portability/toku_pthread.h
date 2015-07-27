@@ -98,9 +98,18 @@ PATENT RIGHTS GRANT:
 #include "toku_portability.h"
 #include "toku_assert.h"
 
-#ifdef MYSQL_TOKUDB_ENGINE
+//#ifdef MYSQL_TOKUDB_ENGINE
 # include <toku_pfs.h>
-#endif
+//#endif
+
+inline
+void toku_instr_mutex_unlock(PSI_mutex *mutex_instr);
+
+inline
+PSI_mutex* toku_instr_mutex_init(const toku_instr_key &key,
+                                 const toku_mutex_t &mutex);
+                                 
+
 
 
 

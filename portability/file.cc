@@ -252,46 +252,34 @@ void toku_set_func_pread (ssize_t (*pread_fun)(int, void *, size_t, off_t)) {
 
 
 int
-inline_toku_os_delete(const char *name
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-)
+toku_os_delete_with_source_location(const char *name, 
+                                    const char *src_file, uint src_line)
 {
     int result;
-#ifdef HAVE_PSI_FILE_INTERFACE   
-    struct PSI_file_locker *locker;
-    PSI_file_locker_state state;
-    register_pfs_file_name_close_begin(&state, locker, *tokudb_file_data_key,
-                                       PSI_FILE_DELETE, name, src_file, src_line);
-#endif
+
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_name_close_begin(io_annotation, *tokudb_file_data_key, 
+                                     toku_instr_file_op::file_delete,
+                                     name, src_file, src_line);
     result= unlink(name);
 
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* Regsiter the returning "r" value with the system */
-    register_pfs_file_close_end(locker, result);
-#endif
+    /* Regsiter the result value with the instrumentation system */
+    toku_instr_file_close_end(io_annotation, result);
+
     return result;
 }
 
 void
-inline_toku_os_full_write(int fd, const void *buf, size_t len
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-)
- {
+toku_os_full_write_with_source_location(int fd, const void *buf, size_t len, 
+                   const char *src_file, uint src_line)
+{
     const char *bp = (const char *) buf;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
     size_t bytes_written= len;
-    //fprintf(stderr,"inline_toku_os_full_write1: %ld: len: %ld fd: %d\n",bytes_written,len, fd);
-    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
-                               src_file, src_line);
-//    if (locker)
-//     fprintf(stderr,"inline_toku_os_full_write1.5: LOCKER OK\n");
-#endif
+
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_write, 
+                                     fd, len, src_file, src_line);
+
     while (len > 0) {
         ssize_t r;
         if (t_full_write) {
@@ -308,28 +296,24 @@ inline_toku_os_full_write(int fd, const void *buf, size_t len
         }
     }
     assert(len == 0);
-#ifdef HAVE_PSI_FILE_INTERFACE
-//    fprintf(stderr,"inline_toku_os_full_write2: %ld: len: %ld\n",bytes_written,len);
-    register_pfs_file_io_end(locker,  bytes_written);
-#endif
+
+    /* Regsiter the result value with the instrumentaion system */
+    toku_instr_file_io_end(io_annotation, bytes_written);
 }
 
 int
-inline_toku_os_write(int fd, const void *buf, size_t len
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+toku_os_write_with_source_location(int fd, const void *buf, size_t len, 
+                                   const char *src_file, uint src_line) 
+{
     const char *bp = (const char *) buf;
     int result = 0;
     ssize_t r;    
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
+
     size_t bytes_written= len;
-    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
-                               src_file, src_line);
-#endif
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_write, 
+                                     fd, len, src_file, src_line);
+
     while (len > 0) {
         if (t_write) {
             r = t_write(fd, bp, len);
@@ -343,34 +327,25 @@ inline_toku_os_write(int fd, const void *buf, size_t len
         len           -= r;
         bp            += r;
     }
-#ifdef HAVE_PSI_FILE_INTERFACE
-//    fprintf(stderr,"inline_toku_os_write: %ld",bytes_written);
-    register_pfs_file_io_end(locker, (len == 0) ? bytes_written : bytes_written-len);
-#endif
+    /* Regsiter the result value with the instrumentaion system */
+    toku_instr_file_io_end(io_annotation, (len == 0) ? bytes_written : bytes_written-len);
+        
     return result;
 }
 
 void
-inline_toku_os_full_pwrite(int fd, const void *buf, size_t len, toku_off_t off
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+toku_os_full_pwrite_with_source_location(int fd, const void *buf, size_t len, 
+                                         toku_off_t off, 
+                                         const char *src_file, uint src_line) 
+{
     assert(0==((long long)buf)%512);
     assert((len%512 == 0) && (off%512)==0); // to make pwrite work.
     const char *bp = (const char *) buf;
-#ifdef HAVE_PSI_FILE_INTERFACE
+
     size_t bytes_written= len;
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-//    fprintf(stderr,"inline_toku_os_full_pwrite: %ld: len: %ld, fd: %d\n",bytes_written,len,fd);
-
-    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
-                               src_file, src_line);
-//    if (locker)
-//     fprintf(stderr,"inline_toku_os_full_pwrite1.5: LOCKER OK\n");
-
-#endif
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_write,
+                                             fd, len, src_file, src_line);
     while (len > 0) {
         ssize_t r;
         if (t_full_pwrite) {
@@ -388,42 +363,32 @@ inline_toku_os_full_pwrite(int fd, const void *buf, size_t len, toku_off_t off
         }
     }
     assert(len == 0);
-#ifdef HAVE_PSI_FILE_INTERFACE
-//    fprintf(stderr,"inline_toku_os_full_pwrite: %ld, len: %ld\n",bytes_written, len);
-    register_pfs_file_io_end(locker, bytes_written);
-#endif
 
+    /* Regsiter the result value with the instrumentaion system */
+    toku_instr_file_io_end(io_annotation, bytes_written);
+        
 }
 
 ssize_t
-inline_toku_os_pwrite (int fd, const void *buf, size_t len, toku_off_t off
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+toku_os_pwrite_with_source_location(int fd, const void *buf, 
+                                    size_t len, toku_off_t off, 
+                                    const char *src_file, 
+                                    uint src_line) 
+{
     assert(0==((long long)buf)%512); // these asserts are to ensure that direct I/O will work.
     assert(0==len             %512);
     assert(0==off             %512);
     const char *bp = (const char *) buf;
     ssize_t result = 0;
     ssize_t r;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    size_t bytes_written= len;
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-//    fprintf(stderr,"inline_toku_os_pwrite1: %ld: len: %ld, fd: %d\n",bytes_written,len,fd);
-    register_pfs_file_io_begin(&state, locker, fd, len, PSI_FILE_WRITE, 
-                               src_file, src_line);
-//    if (locker)
-//     fprintf(stderr,"inline_toku_os_pwrite1.5: LOCKER OK\n");
 
-#endif
+    size_t bytes_written= len;
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_write,
+                                     fd, len, src_file, src_line);
     while (len > 0) {
-        if (t_pwrite) {
-            r = t_pwrite(fd, bp, len, off);
-        } else {
-            r = pwrite(fd, bp, len, off);
-        }
+        r = (t_pwrite) ? t_pwrite(fd, bp, len, off) : pwrite(fd, bp, len, off);
+        
         if (r < 0) {
             result = errno;
             break;
@@ -432,34 +397,31 @@ inline_toku_os_pwrite (int fd, const void *buf, size_t len, toku_off_t off
         bp            += r;
         off           += r;
     }
-#ifdef HAVE_PSI_FILE_INTERFACE
-//    fprintf(stderr,"inline_toku_os_pwrite: %ld, len: %ld\n",bytes_written, len);
-    register_pfs_file_io_end(locker, (len == 0) ? bytes_written : bytes_written-len);
-#endif
+    /* Regsiter the result value with the instrumentaion system */
+    toku_instr_file_io_end(io_annotation, (len == 0) ? bytes_written : bytes_written-len);
+        
     return result;
 }
 
 int
-inline_toku_os_fwrite (const void *ptr, size_t size, size_t nmemb, TOKU_FILE *stream
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+toku_os_fwrite_with_source_location (const void *ptr, size_t size, size_t nmemb, 
+                                     TOKU_FILE *stream, 
+                                     const char *src_file, uint src_line) 
+{
     int result = 0;
-    size_t written;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_stream_io_begin(&state, locker, stream->psi_key, nmemb, 
-                                      PSI_FILE_WRITE, src_file, src_line);
-#endif
+    size_t bytes_written;
+
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_stream_io_begin(io_annotation, toku_instr_file_op::file_write,
+                                             stream , nmemb, src_file, src_line);
+                                              
     if (os_fwrite_fun) {
-        written= os_fwrite_fun(ptr, size, nmemb, stream->file);
+        bytes_written= os_fwrite_fun(ptr, size, nmemb, stream->file);
     } else {
-        written= fwrite(ptr, size, nmemb, stream->file);
+        bytes_written= fwrite(ptr, size, nmemb, stream->file);
     }
 
-    if (written != nmemb) {
+    if (bytes_written != nmemb) {
         if (os_fwrite_fun)    // if using hook to induce artificial errors (for testing) ...
           result= get_maybe_error_errno();        // ... then there is no error in the stream, but there is one in errno
         else
@@ -467,45 +429,42 @@ inline_toku_os_fwrite (const void *ptr, size_t size, size_t nmemb, TOKU_FILE *st
     }
     invariant(result != 0);
     
-#ifdef HAVE_PSI_FILE_INTERFACE
-//    fprintf(stderr,"inline_toku_os_fwrite: %ld",written);
-    register_pfs_file_io_end(locker, written);
-#endif
+    /* Regsiter the result value with the instrumentaion system */
+    toku_instr_file_io_end(io_annotation, bytes_written);
+
     return result;
 }
 
 
 int
-inline_toku_os_fread(void *ptr, size_t size, size_t nmemb, TOKU_FILE *stream
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+toku_os_fread_with_source_location(void *ptr, size_t size, size_t nmemb, TOKU_FILE *stream, 
+                     const char *src_file, uint src_line) 
+{
     int result = 0;
     size_t bytes_read;
-#ifdef HAVE_PSI_FILE_INTERFACE2
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_stream_io_begin(&state, locker, stream->psi_key, nmemb, 
-                                      PSI_FILE_READ, src_file, src_line);
-#endif
+
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_stream_io_begin(io_annotation, toku_instr_file_op::file_read,
+                                             stream , nmemb, src_file, src_line);
+
     if ((bytes_read= fread(ptr, size, nmemb, stream->file)) != nmemb) {
         if ((feof(stream->file))) 
           result= EOF;
         else
           result= ferror(stream->file);
     }  
-#ifdef HAVE_PSI_FILE_INTERFACE2
-    register_pfs_file_io_end(locker, (result == 0) ? bytes_read : 0);
-#endif
+    invariant(result != 0);
+    
+    /* Regsiter the result value with the instrumentaion system */
+    toku_instr_file_io_end(io_annotation, bytes_read);
+
     return result;
 }
 
 
-
 TOKU_FILE * 
-inline_toku_os_fdopen(int fildes, const char *mode
-) {
+inline_toku_os_fdopen(int fildes, const char *mode) 
+{
     //TOKU_FILE * rval;
     TOKU_FILE *XMALLOC(rval);
     if (toku_likely(rval != NULL))
@@ -535,11 +494,11 @@ toku_os_fopen_with_source_location(const char *filename, const char *mode,
 
     toku_io_instrumentation io_annotation;
     toku_instr_file_open_begin(io_annotation, instr_key,
-                               toku_instr_file_op::fopen, filename, src_file,
-                               src_line);
+                               toku_instr_file_op::file_stream_open, 
+                               filename, src_file, src_line);
     rval->file = t_fopen ? t_fopen(filename, mode) : fopen(filename, mode);
     /* Register the returning "file" value with the system */
-    toku_instr_fopen_end(io_annotation, *rval);
+    toku_instr_file_stream_open_end(io_annotation, *rval);
     if (toku_unlikely(rval->file == NULL))
     {
       toku_free(rval);
@@ -553,29 +512,28 @@ toku_os_open_with_source_location(const char *path, int oflag, int mode,
                                   const toku_instr_key &instr_key,
                                   const char *src_file, uint src_line)
 {
-    int rval;
+    int fd;
     toku_io_instrumentation io_annotation;
     /* register a file open or creation depending on "oflag" */
     toku_instr_file_open_begin(io_annotation, instr_key,
                                ((oflag & O_CREAT)
-                                ? toku_instr_file_op::create
-                                : toku_instr_file_op::open),
+                                ? toku_instr_file_op::file_create
+                                : toku_instr_file_op::file_open),
                                path, src_file, src_line);
     if (t_open)
-	rval = t_open(path, oflag, mode);
+	fd = t_open(path, oflag, mode);
     else
-	rval = open(path, oflag, mode);
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* Register the returning "rval" value with the system */
-//    fprintf(stderr,"inline_toku_os_open: open fd: %d\n", rval);
-    register_pfs_file_open_end(locker, rval);
-#endif
-    return rval;
+	fd = open(path, oflag, mode);
+
+    /* Register the returning file descriptor with the system */
+    toku_instr_file_open_end(io_annotation, fd);
+    return fd;
 }
 
 int
 toku_os_open_direct(const char *path, int oflag, int mode,
-                    const toku_instr_key &instr_key) {
+                    const toku_instr_key &instr_key) 
+{
     int rval;
 #if defined(HAVE_O_DIRECT)
     rval = toku_os_open(path, oflag | O_DIRECT, mode, instr_key);
@@ -595,54 +553,45 @@ toku_os_open_direct(const char *path, int oflag, int mode,
 
 
 int
-inline_toku_os_fclose(TOKU_FILE * stream
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {  
+toku_os_fclose_with_source_location(TOKU_FILE * stream, 
+                                    const char *src_file, uint src_line) 
+{  
     int rval = -1;
     if (toku_likely(stream != NULL))
     {
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* register a file stream close " */
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_stream_close_begin(&state, locker, PSI_FILE_STREAM_CLOSE,
-                                         stream->psi_key, src_file, src_line);
-#endif
-    if (t_fclose)
-	rval = t_fclose(stream->file);
-    else {                      // if EINTR, retry until success
-	while (rval != 0) {
-	    rval = fclose(stream->file);
-	    if (rval && (errno != EINTR))
-		break;
-	}
-    }
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* Regsiter the returning "rval" value with the system */
-    register_pfs_file_close_end(locker, rval);
-#endif
-    toku_free(stream->file);
+        /* register a file stream close " */
+        toku_io_instrumentation io_annotation;
+        toku_instr_file_stream_close_begin(io_annotation, 
+                                       toku_instr_file_op::file_stream_close,
+                                       stream, src_file, src_line);
+                                                                       
+        if (t_fclose)
+        	rval = t_fclose(stream->file);
+        else {                      // if EINTR, retry until success
+	    while (rval != 0) {
+	        rval = fclose(stream->file);
+	        if (rval && (errno != EINTR))
+		    break;
+            }
+        }
+        /* Regsiter the returning "rval" value with the system */
+        toku_instr_file_close_end(io_annotation, rval);
+        toku_free(stream->file);
     }
     return rval;
 }
 
 int 
-inline_toku_os_close(int fd
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {  // if EINTR, retry until success
+toku_os_close_with_source_location(int fd, const char *src_file, uint src_line)
+{  // if EINTR, retry until success
         /* register the file close */
     int r = -1;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* register a file stream close " */
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_fd_close_begin(&state, locker, PSI_FILE_CLOSE,
-                                     fd, src_file, src_line);
-#endif
+
+    /* register a file descriptor close " */
+    toku_io_instrumentation io_annotation;
+    toku_instr_file_fd_close_begin(io_annotation,
+                                   toku_instr_file_op::file_close,
+                                   fd, src_file, src_line);
     while (r != 0) {
 	r = close(fd);
 	if (r) {
@@ -651,64 +600,56 @@ inline_toku_os_close(int fd
 	    assert(rr==EINTR);
 	}
     }
-#ifdef HAVE_PSI_FILE_INTERFACE
-    /* Regsiter the returning "r" value with the system */
-    register_pfs_file_close_end(locker, r);
-#endif
+
+    /* Regsiter the returning value with the system */
+    toku_instr_file_close_end(io_annotation, r);
+
     return r;
 }
 
 ssize_t 
-inline_toku_os_read(int fd, void *buf, size_t count
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
-    ssize_t r;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_io_begin(&state, locker, fd, count, PSI_FILE_READ, 
-                               src_file, src_line);
-#endif
+toku_os_read_with_source_location(int fd, void *buf, size_t count, 
+                                  const char *src_file, uint src_line) 
+{
+    ssize_t bytes_read;
+
+    toku_io_instrumentation io_annotation; 
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_read,
+                             fd, count, src_file, src_line);
+
     if (t_read)
-        r = t_read(fd, buf, count);
-    else
-        r = read(fd, buf, count);
-#ifdef HAVE_PSI_FILE_INTERFACE
-    register_pfs_file_io_end(locker, r);
-#endif
-    return r;
+        bytes_read = (t_read) ? t_read(fd, buf, count): read(fd, buf, count);
+
+    toku_instr_file_io_end(io_annotation, bytes_read);
+
+    return bytes_read;
 }
 
 ssize_t
-inline_toku_os_pread (int fd, void *buf, size_t count, off_t offset
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+inline_toku_os_pread_with_source_location(int fd, void *buf, size_t count, 
+                                          off_t offset, const char *src_file, 
+                                          uint src_line)
+{
     assert(0==((long long)buf)%512);
     assert(0==count%512);
     assert(0==offset%512);
-    ssize_t r;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_io_begin(&state, locker, fd, count, PSI_FILE_READ, 
-                               src_file, src_line);
-#endif
+    ssize_t bytes_read;
+
+    toku_io_instrumentation io_annotation; 
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_read,
+                             fd, count, src_file, src_line);
     if (t_pread) {
-	r = t_pread(fd, buf, count, offset);
+	bytes_read = t_pread(fd, buf, count, offset);
     } else {
-	r = pread(fd, buf, count, offset);
+	bytes_read = pread(fd, buf, count, offset);
     }
-#ifdef HAVE_PSI_FILE_INTERFACE
-    register_pfs_file_io_end(locker, r);
-#endif
-    return r;
+    toku_instr_file_io_end(io_annotation, bytes_read);
+
+    return bytes_read;
 }
 
-void toku_os_recursive_delete(const char *path) {
+void toku_os_recursive_delete(const char *path) 
+{
     char buf[TOKU_PATH_MAX + sizeof("rm -rf ")];
     strcpy(buf, "rm -rf ");
     strncat(buf, path, TOKU_PATH_MAX);
@@ -733,20 +674,17 @@ void toku_set_func_fsync(int (*fsync_function)(int)) {
 }
 
 // keep trying if fsync fails because of EINTR
-static void inline_file_fsync_internal (int fd
-#ifdef HAVE_PSI_FILE_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-) {
+void file_fsync_internal_with_source_location(int fd, 
+                                const char *src_file, uint src_line)
+{
     uint64_t tstart = toku_current_time_microsec();
     int r = -1;
     uint64_t eintr_count = 0;
-#ifdef HAVE_PSI_FILE_INTERFACE
-    struct PSI_file_locker *locker = NULL;
-    PSI_file_locker_state state;   
-    register_pfs_file_io_begin(&state, locker, fd, 0, PSI_FILE_SYNC, 
-                               src_file, src_line);
-#endif
+
+    toku_io_instrumentation io_annotation; 
+    toku_instr_file_io_begin(io_annotation, toku_instr_file_op::file_sync,
+                             fd, 0, src_file, src_line);
+
     while (r != 0) {
 	if (t_fsync) {
 	    r = t_fsync(fd);
@@ -761,9 +699,9 @@ static void inline_file_fsync_internal (int fd
     toku_sync_fetch_and_add(&toku_fsync_count, 1);
     uint64_t duration = toku_current_time_microsec() - tstart;
     toku_sync_fetch_and_add(&toku_fsync_time, duration);
-#ifdef HAVE_PSI_FILE_INTERFACE
-    register_pfs_file_io_end(locker, 0);
-#endif
+
+    toku_instr_file_io_end(io_annotation, 0);
+
     if (duration >= toku_long_fsync_threshold) {
         toku_sync_fetch_and_add(&toku_long_fsync_count, 1);
         toku_sync_fetch_and_add(&toku_long_fsync_time, duration);
