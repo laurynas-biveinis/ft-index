@@ -43,6 +43,8 @@ inline
 void toku_mutex_init(const toku_instr_key &key, toku_mutex_t *mutex,
                      const toku_pthread_mutexattr_t *attr);
 
+inline void toku_mutex_destroy(toku_mutex_t *mutex);
+
 inline
 void toku_mutex_destroy(toku_mutex_t *mutex);
 
@@ -278,3 +280,30 @@ extern toku_instr_key *indexer_i_indexer_lock_mutex_key;
 extern toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
 extern toku_instr_key *locktree_request_info_mutex_key;
 
+// TODO: horrible
+inline
+void toku_mutex_init(const toku_instr_key &key, toku_mutex_t *mutex,
+                     const toku_pthread_mutexattr_t *attr)
+{
+    mutex->psi_mutex = toku_instr_mutex_init(key, *mutex);
+    int r = pthread_mutex_init(&mutex->pmutex, attr);
+    assert_zero(r);
+#if TOKU_PTHREAD_DEBUG
+    mutex->locked = false;
+    invariant(!mutex->valid);
+    mutex->valid = true;
+    mutex->owner = 0;
+#endif
+}
+
+inline void toku_mutex_destroy(toku_mutex_t *mutex)
+{
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->valid);
+    mutex->valid = false;
+    invariant(!mutex->locked);
+#endif
+    toku_instr_mutex_destroy(mutex->psi_mutex);
+    int r = pthread_mutex_destroy(&mutex->pmutex);
+    assert_zero(r);
+}
