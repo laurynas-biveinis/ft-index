@@ -250,6 +250,7 @@ toku_instr_key *manager_escalator_mutex_key;
 toku_instr_key *db_txn_struct_i_txn_mutex_key;
 toku_instr_key *indexer_i_indexer_lock_mutex_key;
 toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
+toku_instr_key *circular_buffer_m_lock_mutex_key;
 
 static toku_instr_key *fti_probe_1_key;
 static toku_instr_key *fti_probe_2_key;
