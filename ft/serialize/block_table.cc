@@ -110,7 +110,7 @@ PATENT RIGHTS GRANT:
 
 
 toku_instr_key *block_table_mutex_key;
-pfs_key_t safe_file_size_lock_mutex_key;
+toku_instr_key *safe_file_size_lock_mutex_key;
 pfs_key_t safe_file_size_lock_rwlock_key;
 
 // indicates the end of a freelist
@@ -158,7 +158,7 @@ void block_table::_create_internal() {
     memset(&_checkpointed, 0, sizeof(struct translation));
     memset(&_mutex, 0, sizeof(_mutex));
     toku_mutex_init(*block_table_mutex_key, &_mutex, nullptr);
-    nb_mutex_init(safe_file_size_lock_mutex_key, safe_file_size_lock_rwlock_key, &_safe_file_size_lock);
+    nb_mutex_init(*safe_file_size_lock_mutex_key, safe_file_size_lock_rwlock_key, &_safe_file_size_lock);
 }
 
 // Fill in the checkpointed translation from buffer, and copy checkpointed to current.

@@ -114,9 +114,9 @@ typedef struct timespec toku_timespec_t;
 #  undef HAVE_PSI_COND_INTERFACE
 #endif
 
-#ifndef TOKU_PTHREAD_DEBUG
-# define TOKU_PTHREAD_DEBUG 0
-#endif
+//#ifndef TOKU_PTHREAD_DEBUG
+//# define TOKU_PTHREAD_DEBUG 0
+//#endif
 
 typedef struct toku_mutex_aligned {
     toku_mutex_t aligned_mutex __attribute__((__aligned__(64)));

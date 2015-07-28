@@ -264,10 +264,6 @@ toku_instr_probe *toku_instr_probe_4;
 #ifdef HAVE_PSI_INTERFACE
 
 //ft-index mutexes
-extern pfs_key_t cachetable_m_mutex_key;
-extern pfs_key_t safe_file_size_lock_mutex_key;
-extern pfs_key_t cachetable_disk_nb_mutex_key;
-extern pfs_key_t circular_buffer_m_lock_mutex_key;
 
 //condition vars
 extern pfs_key_t result_state_cond_key;
@@ -306,14 +302,6 @@ extern pfs_key_t safe_file_size_lock_rwlock_key;
 extern pfs_key_t cachetable_disk_nb_rwlock_key;
 
 //extern pfs_key_t fmutex_cond_key;   
-
-static PSI_mutex_info   all_ftindex_mutexes[] = {
-        {&circular_buffer_m_lock_mutex_key, "circular_buffer_m_lock_mutex", 0},
-        {&manger_escalator_mutex_key, "manager_escalator_mutex", 0},   
-        {&cachetable_m_mutex_key, "cachetable_m_mutex", 0},
-        {&safe_file_size_lock_mutex_key,"safe_file_size_lock_mutex",0},
-        {&cachetable_disk_nb_mutex_key,"cachetable_disk_nb_mutex",0},        
-};
 
 static PSI_cond_info all_ftindex_conds[] = {
             {&result_state_cond_key,"result_state_cond",0},
@@ -4655,9 +4643,6 @@ int toku_ft_layer_init(void) {
 #ifdef HAVE_PSI_INTERFACE
     int count;
 
-    count = array_elements(all_ftindex_mutexes);
-    mysql_mutex_register("fti", all_ftindex_mutexes, count);
-    
     count = array_elements(all_ftindex_rwlocks);
     mysql_rwlock_register("fti", all_ftindex_rwlocks, count);
   
@@ -4683,6 +4668,18 @@ int toku_ft_layer_init(void) {
     cachetable_ev_thread_lock_mutex_key
         = new toku_instr_key(toku_instr_object_type::mutex, "fti",
                              "cachetable_ev_thread_lock_mutex");
+    cachetable_disk_nb_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "cachetable_disk_nb_mutex");
+    safe_file_size_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "safe_file_size_lock_mutex");
+    circular_buffer_m_lock_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "circular_buffer_m_lock_mutex_key");
+    cachetable_m_mutex_key
+        = new toku_instr_key(toku_instr_object_type::mutex, "fti",
+                             "cachetable_m_mutex_key");
     checkpoint_safe_mutex_key
         = new toku_instr_key(toku_instr_object_type::mutex, "fti",
                              "checkpoint_safe_mutex");

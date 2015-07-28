@@ -95,6 +95,8 @@ PATENT RIGHTS GRANT:
 #include <toku_list.h>
 #include <toku_pthread.h>
 
+extern pfs_key_t ws_worker_wait_key;
+
 // The work struct is the base class for work to be done by some threads
 struct work {
     struct toku_list next;

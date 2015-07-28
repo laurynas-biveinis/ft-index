@@ -153,7 +153,7 @@ env_panic(DB_ENV * env, int cause, const char * msg) {
 }
 
 pfs_key_t result_i_open_dbs_rwlock_key;
-pfs_key_t circular_buffer_m_lock_mutex_key;
+toku_instr_key *circular_buffer_m_lock_mutex_key;
 pfs_key_t circular_buffer_m_push_cond_key;
 pfs_key_t circular_buffer_m_pop_cond_key;
 

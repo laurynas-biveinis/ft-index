@@ -110,7 +110,7 @@ PATENT RIGHTS GRANT:
 #include "util/status.h"
 #include "util/context.h"
 
-pfs_key_t cachetable_m_mutex_key;
+toku_instr_key *cachetable_m_mutex_key;
 toku_instr_key *cachetable_ev_thread_lock_mutex_key;
 
 pfs_key_t cachetable_m_list_lock_key;   
@@ -119,13 +119,13 @@ pfs_key_t cachetable_m_pending_lock_cheap_key;
 pfs_key_t cachetable_m_lock_key;
 
 pfs_key_t cachetable_value_key;
-pfs_key_t cachetable_disk_nb_mutex_key;
 pfs_key_t cachetable_disk_nb_rwlock_key;
 
 pfs_key_t cachetable_p_refcount_wait_key;
 pfs_key_t cachetable_m_flow_control_cond_key;
 pfs_key_t cachetable_m_ev_thread_cond_key;
 
+toku_instr_key *cachetable_disk_nb_mutex_key;
 toku_instr_key *log_internal_lock_mutex_key;
 toku_instr_key *eviction_thread_key;
 
@@ -857,7 +857,7 @@ void pair_init(PAIR p,
     , cachetable_value_key
  #endif
     );
-    nb_mutex_init(cachetable_disk_nb_mutex_key, cachetable_disk_nb_rwlock_key, &p->disk_nb_mutex);
+    nb_mutex_init(*cachetable_disk_nb_mutex_key, cachetable_disk_nb_rwlock_key, &p->disk_nb_mutex);
 
     p->size_evicting_estimate = 0; // <CER> Is zero the correct init value?
 
@@ -3292,7 +3292,7 @@ void pair_list::init() {
     XCALLOC_N(m_num_locks, m_mutexes);
     for (uint64_t i = 0; i < m_num_locks; i++) {
 #ifdef TOKU_PFS_MUTEX_EXTENDED_CACHETABLEMMUTEX
-        toku_mutex_init(cachetable_m_mutex_key, &m_mutexes[i].aligned_mutex, NULL);
+        toku_mutex_init(*cachetable_m_mutex_key, &m_mutexes[i].aligned_mutex, NULL);
 #else
         toku_mutex_init(toku_uninstrumented, &m_mutexes[i].aligned_mutex, NULL);
 #endif

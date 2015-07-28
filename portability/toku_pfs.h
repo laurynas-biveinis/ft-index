@@ -256,6 +256,10 @@ extern toku_instr_key *workset_lock_mutex_key;
 extern toku_instr_key *bjm_jobs_lock_mutex_key;
 extern toku_instr_key *log_internal_lock_mutex_key;
 extern toku_instr_key *cachetable_ev_thread_lock_mutex_key;
+extern toku_instr_key *cachetable_disk_nb_mutex_key;
+extern toku_instr_key *cachetable_m_mutex_key;
+extern toku_instr_key *circular_buffer_m_lock_mutex_key;
+extern toku_instr_key *safe_file_size_lock_mutex_key;
 extern toku_instr_key *checkpoint_safe_mutex_key;
 extern toku_instr_key *ft_ref_lock_mutex_key;
 extern toku_instr_key *loader_error_mutex_key;
@@ -281,6 +285,7 @@ extern toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
 extern toku_instr_key *locktree_request_info_mutex_key;
 
 // TODO: horrible
+/*
 inline
 void toku_mutex_init(const toku_instr_key &key, toku_mutex_t *mutex,
                      const toku_pthread_mutexattr_t *attr)
@@ -307,3 +312,4 @@ inline void toku_mutex_destroy(toku_mutex_t *mutex)
     int r = pthread_mutex_destroy(&mutex->pmutex);
     assert_zero(r);
 }
+*/

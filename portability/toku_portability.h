@@ -518,4 +518,35 @@ static inline uint64_t roundup_to_multiple(uint64_t alignment, uint64_t v) {
     return (v + alignment - 1) & ~(alignment - 1);
 }
 
+#undef TOKU_PTHREAD_DEBUG
+# define TOKU_PTHREAD_DEBUG 0
+
+
+// TODO: horrible
+inline
+void toku_mutex_init(const toku_instr_key &key, toku_mutex_t *mutex,
+                     const toku_pthread_mutexattr_t *attr)
+{
+    mutex->psi_mutex = toku_instr_mutex_init(key, *mutex);
+    int r = pthread_mutex_init(&mutex->pmutex, attr);
+    assert_zero(r);
+#if TOKU_PTHREAD_DEBUG
+    mutex->locked = false;
+    invariant(!mutex->valid);
+    mutex->valid = true;
+    mutex->owner = 0;
+#endif
+}
+
+inline void toku_mutex_destroy(toku_mutex_t *mutex)
+{
+#if TOKU_PTHREAD_DEBUG
+    invariant(mutex->valid);
+    mutex->valid = false;
+    invariant(!mutex->locked);
+#endif
+    toku_instr_mutex_destroy(mutex->psi_mutex);
+    int r = pthread_mutex_destroy(&mutex->pmutex);
+    assert_zero(r);
+}
 
