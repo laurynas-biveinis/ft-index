@@ -1,6 +1,6 @@
 #pragma once
 
-extern pfs_key_t fmutex_cond_key;
+extern toku_instr_key *fmutex_cond_key;
 
 // fair mutex
 struct fmutex {
@@ -62,7 +62,7 @@ void fmutex_lock(struct fmutex *fm) {
     }
 
     pthread_cond_t cond;
-    pthread_cond_init(fmutex_cond_key, &cond, NULL);
+    pthread_cond_init(*fmutex_cond_key, &cond, NULL);
     struct queue_item item = { .cond = &cond, .next = NULL };
     enq_item(fm, &item);
 

@@ -102,8 +102,8 @@ PATENT RIGHTS GRANT:
 #include "threadpool.h"
 
 toku_instr_key *tpool_lock_mutex_key;
-pfs_key_t tp_thread_wait_key;
-pfs_key_t tp_pool_wait_free_key;
+toku_instr_key *tp_thread_wait_key;
+toku_instr_key *tp_pool_wait_free_key;
 toku_instr_key *tp_internal_thread_key;
 
 struct toku_thread {
@@ -142,7 +142,7 @@ toku_thread_create(struct toku_thread_pool *pool, struct toku_thread **toku_thre
     } else {
         memset(thread, 0, sizeof *thread);
         thread->pool = pool;
-        toku_cond_init(tp_thread_wait_key,&thread->wait, nullptr);
+        toku_cond_init(*tp_thread_wait_key,&thread->wait, nullptr);
         r = toku_pthread_create(*tp_internal_thread_key, &thread->tid, nullptr,
                                 toku_thread_run_internal, thread);
         if (r) {
@@ -219,7 +219,7 @@ toku_thread_pool_create(struct toku_thread_pool **pool_return, int max_threads) 
         toku_mutex_init(*tpool_lock_mutex_key, &pool->lock, nullptr);
         toku_list_init(&pool->free_threads);
         toku_list_init(&pool->all_threads);
-        toku_cond_init(tp_pool_wait_free_key, &pool->wait_free, nullptr);
+        toku_cond_init(*tp_pool_wait_free_key, &pool->wait_free, nullptr);
         pool->cur_threads = 0;
         pool->max_threads = max_threads;
         *pool_return = pool;

@@ -259,6 +259,7 @@ inline
 PSI_mutex* toku_instr_mutex_init(const toku_instr_key &key,
                                  toku_mutex_t &mutex)
 {
+//TODO: why before debug?
     return PSI_MUTEX_CALL(init_mutex)(key.id(), &mutex.pmutex);
 #if TOKU_PTHREAD_DEBUG
     mutex.instr_key_id = key.id();
@@ -355,3 +356,188 @@ class toku_instr_probe_pfs
 };
 
 typedef toku_instr_probe_pfs toku_instr_probe;
+
+
+// Condvar instrumentation
+
+struct toku_cond_instrumentation
+{
+    struct PSI_cond_locker *locker;
+    PSI_cond_locker_state state;
+
+    toku_cond_instrumentation() : locker(nullptr) { }
+};
+
+enum class toku_instr_cond_op {
+    cond_wait = PSI_COND_WAIT,
+    cond_timedwait = PSI_COND_TIMEDWAIT,
+};
+
+inline
+PSI_cond* toku_instr_cond_init(const toku_instr_key &key,
+                                 toku_cond_t &cond)
+{
+#if TOKU_PTHREAD_DEBUG
+    cond.instr_key_id = key.id();
+    if (key.id() != PFS_NOT_INSTRUMENTED && cond.psi_cond == NULL )
+        fprintf(stderr,"initing tokudb cond_var: key: %d NULL\n", key.id());
+#endif
+    return PSI_COND_CALL(init_cond)(key.id(), &cond.pcond);
+}
+
+inline
+void toku_instr_cond_destroy(PSI_cond* &cond_instr)
+{
+    if (cond_instr != nullptr)
+    {
+        PSI_MUTEX_CALL(destroy_cond)(cond_instr);
+        cond_instr = nullptr;
+    }
+}
+
+inline
+void toku_instr_cond_wait_start(toku_cond_instrumentation &cond_instr,
+                                toku_instr_cond_op op,
+                                toku_cond_t &cond, toku_mutex_t &mutex,
+                                const char *src_file, int src_line)
+{
+    if (cond.psi_cond)
+    {
+    /* Instrumentation start */
+        cond_instr.locker= PSI_COND_CALL(start_cond_wait)
+            (&cond_instr.state, cond.psi_cond, mutex.psi_mutex,
+             (PSI_cond_operation) op, src_file, src_line);
+#if TOKU_PTHREAD_DEBUG
+        if (!cond_instr.locker)
+            fprintf(stderr, "Can't start timer for cond_var key: %d\n",
+                    cond.instr_key_id);
+#endif
+    }
+
+}
+
+inline
+void toku_instr_cond_wait_end(toku_cond_instrumentation &cond_instr,
+                               int pthread_cond_wait_result)
+{
+    if (cond_instr.locker)
+        PSI_MUTEX_CALL(end_cond_wait)(cond_instr.locker,
+                                      pthread_cond_wait_result);
+}
+                               
+
+inline
+void toku_instr_cond_signal(toku_cond_t &cond)
+{
+    if (cond.psi_cond)
+        PSI_MUTEX_CALL(signal_cond)(cond.psi_cond);
+}
+
+inline
+void toku_instr_cond_broadcast(toku_cond_t &cond)
+{
+    if (cond.psi_cond)
+        PSI_MUTEX_CALL(broadcast_cond)(cond.psi_cond);
+}
+                               
+// rwlock instrumentation
+
+struct toku_rwlock_instrumentation
+{
+    struct PSI_rwlock_locker *locker;
+    PSI_rwlock_locker_state state;
+
+    toku_rwlock_instrumentation() : locker(nullptr) { }
+};
+
+inline
+PSI_rwlock* toku_instr_rwlock_init(const toku_instr_key &key,
+                                 toku_pthread_rwlock_t &rwlock)
+{
+#if TOKU_PTHREAD_DEBUG
+    rwlock.instr_key_id = key.id();
+    if (key.id() != PFS_NOT_INSTRUMENTED && rwlock.psi_rwlock == NULL )
+        fprintf(stderr,"initing tokudb rwlock: key: %d NULL\n", key.id());
+#endif
+    return PSI_COND_CALL(init_rwlock)(key.id(), &rwlock.rwlock);
+}
+
+inline
+void toku_instr_rwlock_destroy(PSI_rwlock* &rwlock_instr)
+{
+    if (rwlock_instr != nullptr)
+    {
+        PSI_MUTEX_CALL(destroy_rwlock)(rwlock_instr);
+        rwlock_instr = nullptr;
+    }
+}
+
+inline
+void toku_instr_rwlock_rdlock_wait_start(toku_rwlock_instrumentation &rwlock_instr,
+                                         toku_pthread_rwlock_t &rwlock,
+                                         const char *src_file, int src_line)
+{
+    if (rwlock.psi_rwlock)
+    {
+    /* Instrumentation start */
+    rwlock_instr.locker= PSI_RWLOCK_CALL(start_rwlock_rdwait)
+                         (&rwlock_instr.state, rwlock.psi_rwlock,
+                          PSI_RWLOCK_READLOCK, src_file, src_line);
+                                                    
+#if TOKU_PTHREAD_DEBUG
+        if (!rwlock_instr.locker)
+            fprintf(stderr, "Can't start timer for rwlock key: %d\n",
+                    rwlock.instr_key_id);
+#endif
+    }
+
+}
+
+inline
+void toku_instr_rwlock_wrlock_wait_start(toku_rwlock_instrumentation &rwlock_instr,
+                                         toku_pthread_rwlock_t &rwlock,
+                                         const char *src_file, int src_line)
+{
+    if (rwlock.psi_rwlock)
+    {
+    /* Instrumentation start */
+    rwlock_instr.locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)
+                         (&rwlock_instr.state, rwlock.psi_rwlock,
+                          PSI_RWLOCK_WRITELOCK, src_file, src_line);
+                                                    
+#if TOKU_PTHREAD_DEBUG
+        if (!rwlock_instr.locker)
+            fprintf(stderr, "Can't start timer for rwlock key: %d\n",
+                    rwlock.instr_key_id);
+#endif
+    }
+
+}
+                                              
+inline
+void toku_instr_rwlock_rdlock_wait_end(toku_rwlock_instrumentation &rwlock_instr,
+                                       int pthread_rwlock_wait_result)
+{
+    if (rwlock_instr.locker)
+        PSI_MUTEX_CALL(end_rwlock_rdwait)(rwlock_instr.locker,
+                                          pthread_rwlock_wait_result);
+}
+
+inline
+void toku_instr_rwlock_wrlock_wait_end(toku_rwlock_instrumentation &rwlock_instr,
+                                       int pthread_rwlock_wait_result)
+{
+    if (rwlock_instr.locker)
+        PSI_MUTEX_CALL(end_rwlock_wrwait)(rwlock_instr.locker,
+                                          pthread_rwlock_wait_result);
+}
+
+
+inline
+void toku_instr_rwlock_unlock(toku_pthread_rwlock_t &rwlock)
+{
+    if (rwlock.psi_rwlock)
+        PSI_MUTEX_CALL(unlock_rwlock)(rwlock.psi_rwlock);
+}
+
+                                                                 

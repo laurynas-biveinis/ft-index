@@ -96,7 +96,7 @@ PATENT RIGHTS GRANT:
 #include "cachetable/background_job_manager.h"
 
 toku_instr_key *bjm_jobs_lock_mutex_key;
-pfs_key_t bjm_jobs_wait_key; 
+toku_instr_key *bjm_jobs_wait_key; 
 
 struct background_job_manager_struct {
     bool accepting_jobs;

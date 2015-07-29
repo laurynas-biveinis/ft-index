@@ -106,8 +106,8 @@ public:
 
     void init(
               toku_mutex_t *const mutex
-#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
-              ,PSI_rwlock_key psi_key
+#if defined(TOKU_PFS_EXTENDED_FRWLOCKH)
+              ,const toku_instr_key &rwlock_instr_key
 #endif
               );
     void deinit(void);
@@ -170,7 +170,8 @@ private:
     bool m_wait_read_is_in_queue;
 
     toku_cond_t m_wait_read;
-#if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)    
+#if defined(TOKU_PFS_EXTENDED_FRWLOCKH)    
+    toku_rwlock_instrumentation m_rwlock_instr;
     toku_pthread_rwlock_t  m_rwlock;
 #endif
     queue_item *m_wait_head;

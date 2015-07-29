@@ -101,7 +101,7 @@ PATENT RIGHTS GRANT:
 
 toku_instr_key *txn_lock_mutex_key;
 toku_instr_key *txn_state_lock_mutex_key;
-pfs_key_t result_state_cond_key;
+toku_instr_key *result_state_cond_key;
 
 ///////////////////////////////////////////////////////////////////////////////////
 // Engine status
@@ -368,7 +368,7 @@ static txn_child_manager tcm;
     toku_mutex_init(*txn_state_lock_mutex_key, &result->state_lock, &attr);
     toku_mutexattr_destroy(&attr);
 
-    toku_cond_init(result_state_cond_key,&result->state_cond, nullptr);
+    toku_cond_init(*result_state_cond_key,&result->state_cond, nullptr);
 
     *tokutxn = result;
 

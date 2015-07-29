@@ -98,7 +98,7 @@ PATENT RIGHTS GRANT:
 
 #include <util/status.h>
 
-pfs_key_t manager_m_escalator_done_key;
+toku_instr_key *manager_m_escalator_done_key;
 
 namespace toku {
 

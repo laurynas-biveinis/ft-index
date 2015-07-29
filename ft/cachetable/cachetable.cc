@@ -113,17 +113,17 @@ PATENT RIGHTS GRANT:
 toku_instr_key *cachetable_m_mutex_key;
 toku_instr_key *cachetable_ev_thread_lock_mutex_key;
 
-pfs_key_t cachetable_m_list_lock_key;   
-pfs_key_t cachetable_m_pending_lock_expensive_key;
-pfs_key_t cachetable_m_pending_lock_cheap_key;
-pfs_key_t cachetable_m_lock_key;
+toku_instr_key *cachetable_m_list_lock_key;   
+toku_instr_key *cachetable_m_pending_lock_expensive_key;
+toku_instr_key *cachetable_m_pending_lock_cheap_key;
+toku_instr_key *cachetable_m_lock_key;
 
-pfs_key_t cachetable_value_key;
-pfs_key_t cachetable_disk_nb_rwlock_key;
+toku_instr_key *cachetable_value_key;
+toku_instr_key *cachetable_disk_nb_rwlock_key;
 
-pfs_key_t cachetable_p_refcount_wait_key;
-pfs_key_t cachetable_m_flow_control_cond_key;
-pfs_key_t cachetable_m_ev_thread_cond_key;
+toku_instr_key *cachetable_p_refcount_wait_key;
+toku_instr_key *cachetable_m_flow_control_cond_key;
+toku_instr_key *cachetable_m_ev_thread_cond_key;
 
 toku_instr_key *cachetable_disk_nb_mutex_key;
 toku_instr_key *log_internal_lock_mutex_key;
@@ -847,14 +847,14 @@ void pair_init(PAIR p,
     p->count = 0; // <CER> Is zero the correct init value?
     p->refcount = 0;
     p->num_waiting_on_refs = 0;
-    toku_cond_init(cachetable_p_refcount_wait_key,&p->refcount_wait, NULL);
+    toku_cond_init(*cachetable_p_refcount_wait_key,&p->refcount_wait, NULL);
     p->checkpoint_pending = false;
 
     p->mutex = list->get_mutex_for_pair(fullhash);
     assert(p->mutex);
     p->value_rwlock.init(p->mutex
  #if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
-    , cachetable_value_key
+    , *cachetable_value_key
  #endif
     );
     nb_mutex_init(*cachetable_disk_nb_mutex_key, cachetable_disk_nb_rwlock_key, &p->disk_nb_mutex);
@@ -3285,9 +3285,9 @@ void pair_list::init() {
     // TODO: need to figure out how to make writer-preferential rwlocks
     // happen on osx
 #endif
-    toku_pthread_rwlock_init(cachetable_m_list_lock_key, &m_list_lock, &attr);
-    toku_pthread_rwlock_init(cachetable_m_pending_lock_expensive_key, &m_pending_lock_expensive, &attr);    
-    toku_pthread_rwlock_init(cachetable_m_pending_lock_cheap_key, &m_pending_lock_cheap, &attr);    
+    toku_pthread_rwlock_init(*cachetable_m_list_lock_key, &m_list_lock, &attr);
+    toku_pthread_rwlock_init(*cachetable_m_pending_lock_expensive_key, &m_pending_lock_expensive, &attr);    
+    toku_pthread_rwlock_init(*cachetable_m_pending_lock_cheap_key, &m_pending_lock_cheap, &attr);    
     XCALLOC_N(m_table_size, m_table);
     XCALLOC_N(m_num_locks, m_mutexes);
     for (uint64_t i = 0; i < m_num_locks; i++) {
@@ -3686,8 +3686,8 @@ int evictor::init(long _size_limit, pair_list* _pl, cachefile_list* _cf_list, KI
     m_cf_list = _cf_list;
     m_kibbutz = _kibbutz;    
     toku_mutex_init(*cachetable_ev_thread_lock_mutex_key, &m_ev_thread_lock, NULL);
-    toku_cond_init(cachetable_m_flow_control_cond_key,&m_flow_control_cond, NULL);
-    toku_cond_init(cachetable_m_ev_thread_cond_key,&m_ev_thread_cond, NULL);
+    toku_cond_init(*cachetable_m_flow_control_cond_key,&m_flow_control_cond, NULL);
+    toku_cond_init(*cachetable_m_ev_thread_cond_key,&m_ev_thread_cond, NULL);
     m_num_sleepers = 0;    
     m_ev_thread_is_running = false;
     m_period_in_seconds = eviction_period;
@@ -4749,7 +4749,7 @@ static_assert(std::is_pod<cachefile_list>::value, "cachefile_list isn't POD");
 void cachefile_list::init() {
     m_next_filenum_to_use.fileid = 0;
     m_next_hash_id_to_use = 0;
-    toku_pthread_rwlock_init(cachetable_m_lock_key, &m_lock, NULL);
+    toku_pthread_rwlock_init(*cachetable_m_lock_key, &m_lock, NULL);
     m_active_filenum.create();
     m_active_fileid.create();
     m_stale_fileid.create();

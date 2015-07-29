@@ -152,9 +152,9 @@ env_panic(DB_ENV * env, int cause, const char * msg) {
     env->i->panic_string = toku_strdup(msg);
 }
 
-pfs_key_t result_i_open_dbs_rwlock_key;
-pfs_key_t circular_buffer_m_push_cond_key;
-pfs_key_t circular_buffer_m_pop_cond_key;
+toku_instr_key *result_i_open_dbs_rwlock_key;
+toku_instr_key *circular_buffer_m_push_cond_key;
+toku_instr_key *circular_buffer_m_pop_cond_key;
 
 static int env_get_engine_status_num_rows (DB_ENV * UU(env), uint64_t * num_rowsp);
 
@@ -2686,7 +2686,7 @@ toku_env_create(DB_ENV ** envp, uint32_t flags) {
     result->i->open_dbs_by_dname->create();
     XMALLOC(result->i->open_dbs_by_dict_id);
     result->i->open_dbs_by_dict_id->create();
-    toku_pthread_rwlock_init(result_i_open_dbs_rwlock_key,&result->i->open_dbs_rwlock, NULL);
+    toku_pthread_rwlock_init(*result_i_open_dbs_rwlock_key,&result->i->open_dbs_rwlock, NULL);
 
     *envp = result;
     r = 0;

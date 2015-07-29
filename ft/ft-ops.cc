@@ -267,43 +267,44 @@ toku_instr_probe *toku_instr_probe_4;
 //ft-index mutexes
 
 //condition vars
-extern pfs_key_t result_state_cond_key;
-extern pfs_key_t bjm_jobs_wait_key;    
-extern pfs_key_t cachetable_p_refcount_wait_key;
-extern pfs_key_t cachetable_m_flow_control_cond_key;
-extern pfs_key_t cachetable_m_ev_thread_cond_key;   
-extern pfs_key_t bfs_cond_key;
-extern pfs_key_t result_output_condition_key;
-extern pfs_key_t manager_m_escalator_done_key;
-extern pfs_key_t lock_request_m_wait_cond_key;
-extern pfs_key_t queue_result_cond_key;
-extern pfs_key_t ws_worker_wait_key;
-extern pfs_key_t rwlock_wait_read_key;  
-extern pfs_key_t rwlock_wait_write_key; 
-extern pfs_key_t rwlock_cond_key;
-extern pfs_key_t tp_thread_wait_key;
-extern pfs_key_t tp_pool_wait_free_key;
-extern pfs_key_t frwlock_m_wait_read_key;
-extern pfs_key_t kibbutz_k_cond_key;
-extern pfs_key_t minicron_p_condvar_key;
-extern pfs_key_t circular_buffer_m_push_cond_key; 
-extern pfs_key_t circular_buffer_m_pop_cond_key;  
+extern toku_instr_key *result_state_cond_key;
+extern toku_instr_key *bjm_jobs_wait_key;    
+extern toku_instr_key *cachetable_p_refcount_wait_key;
+extern toku_instr_key *cachetable_m_flow_control_cond_key;
+extern toku_instr_key *cachetable_m_ev_thread_cond_key;   
+extern toku_instr_key *bfs_cond_key;
+extern toku_instr_key *result_output_condition_key;
+extern toku_instr_key *manager_m_escalator_done_key;
+extern toku_instr_key *lock_request_m_wait_cond_key;
+extern toku_instr_key *queue_result_cond_key;
+extern toku_instr_key *ws_worker_wait_key;
+extern toku_instr_key *rwlock_wait_read_key;  
+extern toku_instr_key *rwlock_wait_write_key; 
+extern toku_instr_key *rwlock_cond_key;
+extern toku_instr_key *tp_thread_wait_key;
+extern toku_instr_key *tp_pool_wait_free_key;
+extern toku_instr_key *frwlock_m_wait_read_key;
+extern toku_instr_key *kibbutz_k_cond_key;
+extern toku_instr_key *minicron_p_condvar_key;
+extern toku_instr_key *circular_buffer_m_push_cond_key; 
+extern toku_instr_key *circular_buffer_m_pop_cond_key;  
 
 //rwlocks
-extern pfs_key_t multi_operation_lock_key;
-extern pfs_key_t low_priority_multi_operation_lock_key;
-extern pfs_key_t cachetable_m_list_lock_key;   
-extern pfs_key_t cachetable_m_pending_lock_expensive_key;
-extern pfs_key_t cachetable_m_pending_lock_cheap_key;
-extern pfs_key_t cachetable_m_lock_key;
-extern pfs_key_t result_i_open_dbs_rwlock_key;
-extern pfs_key_t checkpoint_safe_rwlock_key;
-extern pfs_key_t cachetable_value_key;
-extern pfs_key_t safe_file_size_lock_rwlock_key;
-extern pfs_key_t cachetable_disk_nb_rwlock_key;
+extern toku_instr_key *multi_operation_lock_key;
+extern toku_instr_key *low_priority_multi_operation_lock_key;
+extern toku_instr_key *cachetable_m_list_lock_key;   
+extern toku_instr_key *cachetable_m_pending_lock_expensive_key;
+extern toku_instr_key *cachetable_m_pending_lock_cheap_key;
+extern toku_instr_key *cachetable_m_lock_key;
+extern toku_instr_key *result_i_open_dbs_rwlock_key;
+extern toku_instr_key *checkpoint_safe_rwlock_key;
+extern toku_instr_key *cachetable_value_key;
+extern toku_instr_key *safe_file_size_lock_rwlock_key;
+extern toku_instr_key *cachetable_disk_nb_rwlock_key;
 
 //extern pfs_key_t fmutex_cond_key;   
 
+/*
 static PSI_cond_info all_ftindex_conds[] = {
             {&result_state_cond_key,"result_state_cond",0},
             {&ws_worker_wait_key,"ws_worker_wait",0},
@@ -330,7 +331,9 @@ static PSI_cond_info all_ftindex_conds[] = {
             {&frwlock_m_wait_read_key,"frwlock_m_wait_read",0},
             {&kibbutz_k_cond_key,"kibbutz_k_cond",0},
 };
+*/
   
+/*
 static PSI_rwlock_info all_ftindex_rwlocks[] = {
             {&multi_operation_lock_key,"multi_operation_lock",0},
             {&low_priority_multi_operation_lock_key,"low_priority_multi_operation_lock",0},
@@ -344,7 +347,7 @@ static PSI_rwlock_info all_ftindex_rwlocks[] = {
             {&safe_file_size_lock_rwlock_key,"safe_file_size_lock_rwlock",0},
             {&cachetable_disk_nb_rwlock_key,"cachetable_disk_nb_rwlock",0},        
 };
-
+*/
 #endif
 
 static void
@@ -4642,13 +4645,13 @@ int toku_ft_layer_init(void) {
     if (r) { goto exit; }
 
 #ifdef HAVE_PSI_INTERFACE
-    int count;
+//    int count;
 
-    count = array_elements(all_ftindex_rwlocks);
-    mysql_rwlock_register("fti", all_ftindex_rwlocks, count);
+//    count = array_elements(all_ftindex_rwlocks);
+//    mysql_rwlock_register("fti", all_ftindex_rwlocks, count);
   
-    count = array_elements(all_ftindex_conds);
-    mysql_cond_register("fti", all_ftindex_conds, count);
+//    count = array_elements(all_ftindex_conds);
+//    mysql_cond_register("fti", all_ftindex_conds, count);
 #endif
 
     kibbutz_mutex_key = new toku_instr_key(toku_instr_object_type::mutex,
@@ -4782,6 +4785,40 @@ int toku_ft_layer_init(void) {
     toku_instr_probe_2 = new toku_instr_probe(*fti_probe_2_key);
     toku_instr_probe_3 = new toku_instr_probe(*fti_probe_3_key);
     toku_instr_probe_4 = new toku_instr_probe(*fti_probe_4_key);
+
+    result_state_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "result_state_cond");
+    bjm_jobs_wait_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "bjm_jobs_wait");
+    cachetable_p_refcount_wait_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "cachetable_p_refcount_wait");
+    cachetable_m_flow_control_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "cachetable_m_flow_control_cond");
+    cachetable_m_ev_thread_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "cachetable_m_ev_thread_cond");
+    bfs_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "bfs_cond");
+    result_output_condition_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "result_output_condition");
+    manager_m_escalator_done_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "manager_m_escalator_done");
+    lock_request_m_wait_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "lock_request_m_wait_cond");
+    queue_result_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "queue_result_cond");
+    ws_worker_wait_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "ws_worker_wait");
+    rwlock_wait_read_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "rwlock_wait_read");
+    rwlock_wait_write_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "rwlock_wait_write");
+    rwlock_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "rwlock_cond");
+    tp_thread_wait_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "tp_thread_wait");
+    tp_pool_wait_free_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "tp_pool_wait_free");
+    frwlock_m_wait_read_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "frwlock_m_wait_read");
+    kibbutz_k_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "kibbutz_k_cond");
+    minicron_p_condvar_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "minicron_p_condvar");
+    circular_buffer_m_push_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "circular_buffer_m_push_cond");
+    circular_buffer_m_pop_cond_key = new toku_instr_key(toku_instr_object_type::cond, "fti", "circular_buffer_m_pop_cond");
+
+    multi_operation_lock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "multi_operation_lock");
+    low_priority_multi_operation_lock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "low_priority_multi_operation_lock");
+    cachetable_m_list_lock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "cachetable_m_list_lock");
+    cachetable_m_pending_lock_expensive_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "cachetable_m_pending_lock_expensive");
+    cachetable_m_pending_lock_cheap_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "cachetable_m_pending_lock_cheap");
+    cachetable_m_lock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "cachetable_m_lock");
+    result_i_open_dbs_rwlock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "result_i_open_dbs_rwlock");
+    checkpoint_safe_rwlock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "checkpoint_safe_rwlock");
+    cachetable_value_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "cachetable_value");
+    safe_file_size_lock_rwlock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "safe_file_size_lock_rwlock");
+    cachetable_disk_nb_rwlock_key = new toku_instr_key(toku_instr_object_type::rwlock, "fti", "cachetable_disk_nb_rwlock");
 
     r = db_env_set_toku_product_name("tokudb");
     if (r) { goto exit; }

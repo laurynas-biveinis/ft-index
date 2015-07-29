@@ -18,6 +18,8 @@ struct TOKU_FILE
 };
 
 struct PSI_mutex;
+struct PSI_cond;
+struct PSI_rwlock;
 
 struct toku_mutex_t {
     pthread_mutex_t pmutex;
@@ -26,12 +28,30 @@ struct toku_mutex_t {
     bool locked;
     bool valid;
 #endif
-
     struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
 #if TOKU_PTHREAD_DEBUG
     pfs_key_t instr_key_id;
 #endif
 };
+
+typedef struct toku_cond {
+    pthread_cond_t pcond;
+    struct PSI_cond *psi_cond;
+#if TOKU_PTHREAD_DEBUG
+    pfs_key_t instr_key_id;
+#endif
+
+} toku_cond_t;
+
+typedef struct toku_rwlock {
+    pthread_rwlock_t rwlock;
+    struct PSI_rwlock *psi_rwlock;
+#if TOKU_PTHREAD_DEBUG
+    pfs_key_t instr_key_id;
+#endif
+} toku_pfs_rwlock_t;
+
+typedef toku_pfs_rwlock_t toku_pthread_rwlock_t;
 
 class toku_instr_key;
 
@@ -224,6 +244,99 @@ void toku_instr_mutex_unlock(UU(PSI_mutex *mutex_instr))
 {
 }
 
+
+struct toku_cond_instrumentation
+{
+};
+
+enum class toku_instr_cond_op {cond_wait, cond_timedwait,};
+
+inline
+PSI_cond* toku_instr_cond_init(UU(const toku_instr_key &key),
+                                 UU(toku_cond_t &cond))
+{
+}
+
+inline
+void toku_instr_cond_destroy(UU(PSI_cond* &cond_instr))
+{
+}
+
+inline
+void toku_instr_cond_wait_start(UU(toku_cond_instrumentation &cond_instr),
+                                UU(toku_instr_cond_op op),
+                                UU(toku_cond_t &cond), UU(toku_mutex_t &mutex),
+                                UU(const char *src_file), UU(int src_line))
+{
+}
+
+inline
+void toku_instr_cond_wait_end(UU(toku_cond_instrumentation &cond_instr),
+                                 UU(int pthread_cond_wait_result))
+{
+}
+                               
+
+inline
+void toku_instr_cond_signal(UU(toku_cond_t &cond))
+{
+}
+
+inline
+void toku_instr_cond_broadcast(UU(toku_cond_t &cond))
+{
+}
+                               
+// rwlock instrumentation
+struct toku_rwlock_instrumentation
+{
+};
+
+inline
+PSI_rwlock* toku_instr_rwlock_init(UU(const toku_instr_key &key),
+                                 UU(toku_pthread_rwlock_t &rwlock))
+{
+}
+
+inline
+void toku_instr_rwlock_destroy(UU(PSI_rwlock* &rwlock_instr))
+{
+}
+
+inline
+void toku_instr_rwlock_rdlock_wait_start(UU(toku_rwlock_instrumentation &rwlock_instr),
+                                         UU(toku_pthread_rwlock &rwlock),
+                                         UU(const char *src_file), UU(int src_line))
+{
+}
+
+inline
+void toku_instr_rwlock_wrlock_wait_start(UU(toku_rwlock_instrumentation &rwlock_instr),
+                                         UU(toku_pthread_rwlock &rwlock),
+                                         UU(const char *src_file), UU(int src_line)
+{
+}
+                                              
+inline
+void toku_instr_rwlock_rdlock_wait_end(UU(toku_rwlock_instrumentation &rwlock_instr),
+                                       UU(int pthread_rwlock_wait_result))
+{
+}
+
+inline
+void toku_instr_rwlock_wrlock_wait_end(UU(toku_rwlock_instrumentation &rwlock_instr),
+                                       UU(int pthread_rwlock_wait_result))
+{
+}
+
+
+inline
+void toku_instr_rwlock_unlock(UU(toku_pthread_rwlock &rwlock))
+{
+}
+
+
+
 #else // MYSQL_TOKUDB_ENGINE
 #include <toku_mysql.h>
 #endif // MYSQL_TOKUDB_ENGINE
@@ -283,6 +396,44 @@ extern toku_instr_key *db_txn_struct_i_txn_mutex_key;
 extern toku_instr_key *indexer_i_indexer_lock_mutex_key;
 extern toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
 extern toku_instr_key *locktree_request_info_mutex_key;
+
+
+//condition vars
+extern toku_instr_key *result_state_cond_key;
+extern toku_instr_key *bjm_jobs_wait_key;    
+extern toku_instr_key *cachetable_p_refcount_wait_key;
+extern toku_instr_key *cachetable_m_flow_control_cond_key;
+extern toku_instr_key *cachetable_m_ev_thread_cond_key;   
+extern toku_instr_key *bfs_cond_key;
+extern toku_instr_key *result_output_condition_key;
+extern toku_instr_key *manager_m_escalator_done_key;
+extern toku_instr_key *lock_request_m_wait_cond_key;
+extern toku_instr_key *queue_result_cond_key;
+extern toku_instr_key *ws_worker_wait_key;
+extern toku_instr_key *rwlock_wait_read_key;  
+extern toku_instr_key *rwlock_wait_write_key; 
+extern toku_instr_key *rwlock_cond_key;
+extern toku_instr_key *tp_thread_wait_key;
+extern toku_instr_key *tp_pool_wait_free_key;
+extern toku_instr_key *frwlock_m_wait_read_key;
+extern toku_instr_key *kibbutz_k_cond_key;
+extern toku_instr_key *minicron_p_condvar_key;
+extern toku_instr_key *circular_buffer_m_push_cond_key; 
+extern toku_instr_key *circular_buffer_m_pop_cond_key;  
+
+//rwlocks
+extern toku_instr_key *multi_operation_lock_key;
+extern toku_instr_key *low_priority_multi_operation_lock_key;
+extern toku_instr_key *cachetable_m_list_lock_key;   
+extern toku_instr_key *cachetable_m_pending_lock_expensive_key;
+extern toku_instr_key *cachetable_m_pending_lock_cheap_key;
+extern toku_instr_key *cachetable_m_lock_key;
+extern toku_instr_key *result_i_open_dbs_rwlock_key;
+extern toku_instr_key *checkpoint_safe_rwlock_key;
+extern toku_instr_key *cachetable_value_key;
+extern toku_instr_key *safe_file_size_lock_rwlock_key;
+extern toku_instr_key *cachetable_disk_nb_rwlock_key;
+
 
 // TODO: horrible
 /*

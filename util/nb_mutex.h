@@ -102,7 +102,7 @@ PATENT RIGHTS GRANT:
 // increase parallelism at the expense of single thread performance, we
 // are experimenting with a single higher level lock.
 
-extern pfs_key_t nb_mutex_key;
+extern toku_instr_key *nb_mutex_key;
 
 typedef struct nb_mutex *NB_MUTEX;
 struct nb_mutex {

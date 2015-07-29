@@ -122,28 +122,6 @@ typedef struct toku_mutex_aligned {
     toku_mutex_t aligned_mutex __attribute__((__aligned__(64)));
 } toku_mutex_aligned_t;
 
-typedef struct toku_cond {
-    pthread_cond_t pcond;
-#ifdef HAVE_PSI_COND_INTERFACE
-    struct PSI_cond *psi_cond;
-#if TOKU_PFS_PTHREAD_DEBUG
-    pfs_key_t psi_key;
-#endif    
-#endif
-} toku_cond_t;
-
-typedef struct toku_rwlock {
-    pthread_rwlock_t rwlock;
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-    struct PSI_rwlock *psi_rwlock;
-#if TOKU_PFS_PTHREAD_DEBUG
-    pfs_key_t psi_key;
-#endif    
-#endif
-} toku_pfs_rwlock_t;
-
-typedef toku_pfs_rwlock_t toku_pthread_rwlock_t;
-
 // Different OSes implement mutexes as different amounts of nested structs.
 // C++ will fill out all missing values with zeroes if you provide at least one zero, but it needs the right amount of nesting.
 #if defined(__FreeBSD__)
@@ -272,8 +250,8 @@ inline void toku_mutex_lock_with_source_location(toku_mutex_t *mutex,
     int r=0;
 
     toku_mutex_instrumentation mutex_instr;
-
     toku_instr_mutex_lock_start(mutex_instr, *mutex, src_file, src_line);
+
     r = pthread_mutex_lock(&mutex->pmutex);
     toku_instr_mutex_lock_end(mutex_instr, r);
 
@@ -292,10 +270,9 @@ inline int toku_mutex_trylock_with_source_location(toku_mutex_t *mutex,
                                                    int src_line)
 {
     int r=0;
-
     toku_mutex_instrumentation mutex_instr;
-
     toku_instr_mutex_trylock_start(mutex_instr, *mutex, src_file, src_line);
+
     r = pthread_mutex_lock(&mutex->pmutex);
     toku_instr_mutex_lock_end(mutex_instr, r);
 
@@ -311,164 +288,57 @@ inline int toku_mutex_trylock_with_source_location(toku_mutex_t *mutex,
     return r;
 }
 
-#ifdef HAVE_PSI_COND_INTERFACE
-  #define toku_cond_init(K, C, A) inline_toku_cond_init(K, C, A)
-#else
-  #define toku_cond_init(K, C, A) inline_toku_cond_init(C, A)
-#endif
+#define toku_cond_wait(C, M) \
+    toku_cond_wait_with_source_location(C, M, __FILE__, __LINE__)
 
-#define nonpfs_toku_cond_init(K, C, A) inline_nonpfs_toku_cond_init(C, A)
-
-#ifdef HAVE_PSI_COND_INTERFACE
-  #define toku_cond_wait(C, M) \
-    inline_toku_cond_wait(C, M, __FILE__, __LINE__)
-#else
-  #define toku_cond_wait(C, M) \
-    inline_toku_cond_wait(C, M) 
-#endif
-            
-#ifdef HAVE_PSI_COND_INTERFACE
-  #define toku_cond_timedwait(C, M, W) \
-    inline_toku_cond_timedwait(C, M, W, __FILE__, __LINE__)
-#else
-  #define toku_cond_timedwait(C, M, W) \
-    inline_toku_cond_timedwait(C, M, W) 
-#endif
-
-#define toku_cond_signal(C) inline_toku_cond_signal(C)
-#define toku_cond_broadcast(C) inline_toku_cond_broadcast(C)
-#define toku_cond_destroy(C) inline_toku_cond_destroy(C)
+#define toku_cond_timedwait(C, M, W) \
+    toku_cond_timedwait_with_source_location(C, M, W, __FILE__, __LINE__)
 
 
-static inline void
-inline_nonpfs_toku_cond_init(toku_cond_t *cond, const toku_pthread_condattr_t *attr) {
-    int r = pthread_cond_init(&cond->pcond, attr);
-    assert_zero(r);
-}
-
-static inline void
-nonpfs_toku_cond_destroy(toku_cond_t *cond) {
-    int r = pthread_cond_destroy(&cond->pcond);
-    assert_zero(r);
-}
-
-static inline void
-nonpfs_toku_cond_wait(toku_cond_t *cond, toku_mutex_t *mutex) {
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->locked);
-    mutex->locked = false;
-    mutex->owner = 0;
-#endif
-    int r = pthread_cond_wait(&cond->pcond, &mutex->pmutex);
-    assert_zero(r);
-#if TOKU_PTHREAD_DEBUG
-    invariant(!mutex->locked);
-    mutex->locked = true;
-    mutex->owner = pthread_self();
-#endif
-}
-
-static inline int 
-nonpfs_toku_cond_timedwait(toku_cond_t *cond, toku_mutex_t *mutex, toku_timespec_t *wakeup_at) {
-#if TOKU_PTHREAD_DEBUG
-    invariant(mutex->locked);
-    mutex->locked = false;
-    mutex->owner = 0;
-#endif
-    int r = pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
-#if TOKU_PTHREAD_DEBUG
-    invariant(!mutex->locked);
-    mutex->locked = true;
-    mutex->owner = pthread_self();
-#endif
-    return r;
-}
-
-static inline void 
-nonpfs_toku_cond_signal(toku_cond_t *cond) {
-    int r = pthread_cond_signal(&cond->pcond);
-    assert_zero(r);
-}
-
-static inline void
-nonpfs_toku_cond_broadcast(toku_cond_t *cond) {
-    int r =pthread_cond_broadcast(&cond->pcond);
-    assert_zero(r);
-}
-
-
-
-static inline void inline_toku_cond_init(
-#ifdef HAVE_PSI_COND_INTERFACE
-  PSI_cond_key key,
-#endif
+inline void toku_cond_init(
+  const toku_instr_key &key,
   toku_cond_t *cond,
   const pthread_condattr_t *attr)
 {
-#ifdef HAVE_PSI_COND_INTERFACE
-  cond->psi_cond= PSI_COND_CALL(init_cond)(key, &cond->psi_cond);
-#if TOKU_PFS_PTHREAD_DEBUG
-  cond->instr_key_id = key.id();
-  if (key != PFS_NOT_INSTRUMENTED && cond->psi_cond == NULL )
-      fprintf(stderr,"initing tokudb cond_var: key: %d NULL\n", key);
-#endif
-#endif
+  cond->psi_cond= toku_instr_cond_init(key, *cond);
   int r = pthread_cond_init(&cond->pcond, attr);
   assert_zero(r);
 }
 
 
-static inline void inline_toku_cond_destroy(
+inline void toku_cond_destroy(
   toku_cond_t *cond)
 {
-#ifdef HAVE_PSI_COND_INTERFACE
-  if (cond->psi_cond != NULL)
-  {
-    PSI_COND_CALL(destroy_cond)(cond->psi_cond);
-    cond->psi_cond= NULL;
-  }
-#endif
+  toku_instr_cond_destroy(cond->psi_cond);
   int r = pthread_cond_destroy(&cond->pcond);
   assert_zero(r);
 }
 
-static inline void inline_toku_cond_wait(
+inline void toku_cond_wait_with_source_location(
   toku_cond_t *cond,
-  toku_mutex_t *mutex
-#ifdef HAVE_PSI_COND_INTERFACE
-  , const char *src_file, uint src_line
-#endif
+  toku_mutex_t *mutex, 
+  const char *src_file, uint src_line
   )   
 {     
   int r=0;
 
 #if TOKU_PTHREAD_DEBUG
-    invariant(mutex->locked);
-    mutex->locked = false;   
-    mutex->owner = 0;
+  invariant(mutex->locked);
+  mutex->locked = false;   
+  mutex->owner = 0;
 #endif
 
-#ifdef HAVE_PSI_COND_INTERFACE
-  PSI_cond_locker *locker;
-  locker= NULL;   
-  PSI_cond_locker_state state;
+  /* Instrumentation start */
+  toku_cond_instrumentation cond_instr;
+  toku_instr_cond_wait_start(cond_instr, toku_instr_cond_op::cond_wait,
+                             *cond, *mutex, src_file, src_line);
 
-  if (cond->psi_cond != NULL)
-  {
-    /* Instrumentation start */
-    locker= PSI_COND_CALL(start_cond_wait)(&state, cond->psi_cond, mutex->psi_mutex,
-                                           PSI_COND_WAIT, src_file, src_line);
-  }
   /* Instrumented code */
   r= pthread_cond_wait(&cond->pcond, &mutex->pmutex);
 
   /* Instrumentation end */
-  if (locker != NULL)
-      PSI_COND_CALL(end_cond_wait)(locker, r);
-#else
-  /* Non instrumented code */
-  r= pthread_cond_wait(&cond->pcond, &mutex->pmutex);
-#endif
+  toku_instr_cond_wait_end(cond_instr, r);
+
   assert_zero(r);
 #if TOKU_PTHREAD_DEBUG
   invariant(!mutex->locked);
@@ -478,44 +348,31 @@ static inline void inline_toku_cond_wait(
 
 }
 
-static inline int inline_toku_cond_timedwait(
+inline int toku_cond_timedwait_with_source_location(
   toku_cond_t *cond,
   toku_mutex_t *mutex,
-  toku_timespec_t *wakeup_at
-#ifdef HAVE_PSI_COND_INTERFACE  
-  , const char *src_file, uint src_line
-#endif
+  toku_timespec_t *wakeup_at, 
+  const char *src_file, uint src_line
   )   
 {     
   int r=0;
 #if TOKU_PTHREAD_DEBUG
-    invariant(mutex->locked);
-    mutex->locked = false;   
-    mutex->owner = 0;
+  invariant(mutex->locked);
+  mutex->locked = false;   
+  mutex->owner = 0;
 #endif
 
-#ifdef HAVE_PSI_COND_INTERFACE
-  PSI_cond_locker *locker;
-  locker= NULL;   
-  PSI_cond_locker_state state;
-
-  if (cond->psi_cond != NULL)
-  {
-    /* Instrumentation start */
-    locker= PSI_COND_CALL(start_cond_wait)(&state, cond->psi_cond, mutex->psi_mutex,
-                                           PSI_COND_TIMEDWAIT, src_file, src_line);
-  }
+  /* Instrumentation start */
+  toku_cond_instrumentation cond_instr;
+  toku_instr_cond_wait_start(cond_instr, toku_instr_cond_op::cond_timedwait,
+                             *cond, *mutex, src_file, src_line);
 
   /* Instrumented code */
   r= pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
 
   /* Instrumentation end */
-  if (locker != NULL)
-    PSI_COND_CALL(end_cond_wait)(locker, r);
-#else
-  /* Non instrumented code */
-  r= pthread_cond_timedwait(&cond->pcond, &mutex->pmutex, wakeup_at);
-#endif
+  toku_instr_cond_wait_end(cond_instr, r);
+
 #if TOKU_PTHREAD_DEBUG
     invariant(!mutex->locked);
     mutex->locked = true;
@@ -525,180 +382,103 @@ static inline int inline_toku_cond_timedwait(
 
 }
 
-static inline void inline_toku_cond_signal(
+inline void toku_cond_signal(
   toku_cond_t *cond)
 {
   int r;
-#ifdef HAVE_PSI_COND_INTERFACE
-  if (cond->psi_cond != NULL)
-    PSI_COND_CALL(signal_cond)(cond->psi_cond);
-#endif
+  toku_instr_cond_signal(*cond);
   r= pthread_cond_signal(&cond->pcond);
   assert_zero(r);
 }
  
-static inline void inline_toku_cond_broadcast(
+inline void toku_cond_broadcast(
   toku_cond_t *cond)
 {
   int r;
-#ifdef HAVE_PSI_COND_INTERFACE
-  if (cond->psi_cond != NULL)
-    PSI_COND_CALL(broadcast_cond)(cond->psi_cond);
-#endif
+  toku_instr_cond_broadcast(*cond);
   r= pthread_cond_broadcast(&cond->pcond);
   assert_zero(r);
 }
 
 
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  #define toku_pthread_rwlock_init(K, RW, A) inline_toku_pthread_rwlock_init(K, RW, A)
-#else
-  #define toku_pthread_rwlock_init(K, RW, A) inline_toku_pthread_rwlock_init(RW, A)
-#endif
+#define toku_pthread_rwlock_rdlock(RW) \
+    toku_pthread_rwlock_rdlock_with_source_location(RW, __FILE__, __LINE__)
 
-#define toku_pthread_rwlock_destroy(RW) inline_toku_pthread_rwlock_destroy(RW)
+#define toku_pthread_rwlock_wrlock(RW) \
+    toku_pthread_rwlock_wrlock_with_source_location(RW, __FILE__, __LINE__)
 
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  #define toku_pthread_rwlock_rdlock(RW) \
-    inline_toku_pthread_rwlock_rdlock(RW, __FILE__, __LINE__)
-#else
-  #define toku_pthread_rwlock_rdlock(RW) \
-    inline_toku_pthread_rwlock_rdlock(RW) 
-#endif
-
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  #define toku_pthread_rwlock_wrlock(RW) \
-    inline_toku_pthread_rwlock_wrlock(RW, __FILE__, __LINE__)
-#else
-  #define toku_pthread_rwlock_wrlock(RW) \
-    inline_toku_pthread_rwlock_wrlock(RW) 
-#endif
-
-#define toku_pthread_rwlock_rdunlock(RW) inline_toku_pthread_rwlock_rdunlock(RW)
-#define toku_pthread_rwlock_wrunlock(RW) inline_toku_pthread_rwlock_wrunlock(RW)
-
-
-
-static inline void inline_toku_pthread_rwlock_init(
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  PSI_rwlock_key key,
-#endif
+inline void toku_pthread_rwlock_init(
+  const toku_instr_key &key,
   toku_pthread_rwlock_t *__restrict rwlock,
   const toku_pthread_rwlockattr_t *__restrict attr)
 {
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  rwlock->psi_rwlock= PSI_RWLOCK_CALL(init_rwlock)(key, &rwlock->rwlock);
-#if TOKU_PFS_PTHREAD_DEBUG
-  rwlock->instr_key_id = key.id();
-  if (key != PFS_NOT_INSTRUMENTED && rwlock->psi_rwlock == NULL )
-      fprintf(stderr,"initing tokudb rwlock: key: %d NULL\n", key);
-#endif
-#endif
+  rwlock->psi_rwlock= toku_instr_rwlock_init(key, *rwlock);
   int r = pthread_rwlock_init(&rwlock->rwlock, attr);
   assert_zero(r);
 }
 
-static inline void inline_toku_pthread_rwlock_destroy(
+inline void toku_pthread_rwlock_destroy(
   toku_pthread_rwlock_t *rwlock)
 {
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  if (rwlock->psi_rwlock != NULL)
-  {
-    PSI_RWLOCK_CALL(destroy_rwlock)(rwlock->psi_rwlock);
-    rwlock->psi_rwlock= NULL;
-  }
-#endif
+  toku_instr_rwlock_destroy(rwlock->psi_rwlock);
   int r = pthread_rwlock_destroy(&rwlock->rwlock);
   assert_zero(r);
 }
 
-static inline void inline_toku_pthread_rwlock_rdlock(
-  toku_pthread_rwlock_t *rwlock
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  , const char *src_file, uint src_line
-#endif
+inline void toku_pthread_rwlock_rdlock_with_source_location(
+  toku_pthread_rwlock_t *rwlock, 
+  const char *src_file, uint src_line
   )   
 {     
   int r=0;
 
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  PSI_rwlock_locker *locker;
-  locker= NULL; 
-  PSI_rwlock_locker_state state;
-  if (rwlock->psi_rwlock != NULL)
-  {
-    /* Instrumentation start */
-    locker= PSI_RWLOCK_CALL(start_rwlock_rdwait)(&state, rwlock->psi_rwlock,
-                                                 PSI_RWLOCK_READLOCK, src_file, src_line);
-  }
-  /* Instrumented code */
-  r= pthread_rwlock_rdlock(&rwlock->rwlock);
-
-  /* Instrumentation end */
-  if (locker != NULL)
-      PSI_RWLOCK_CALL(end_rwlock_rdwait)(locker, r);
-#else
-  /* Non instrumented code */
-  r= pthread_rwlock_rdlock(&rwlock->rwlock);
-#endif
-
-  assert_zero(r);
-}
-
-static inline void inline_toku_pthread_rwlock_wrlock(
-  toku_pthread_rwlock_t *rwlock
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  , const char *src_file, uint src_line
-#endif
-  )   
-{     
-  int r=0;
-
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
   /* Instrumentation start */
-  PSI_rwlock_locker *locker; 
-  locker= NULL;
-  PSI_rwlock_locker_state state;
+  toku_rwlock_instrumentation rwlock_instr;
+  toku_instr_rwlock_rdlock_wait_start(rwlock_instr, *rwlock,
+                                      src_file, src_line);
+  /* Instrumented code */
+  r= pthread_rwlock_rdlock(&rwlock->rwlock);
+ 
+  /* Instrumentation end */
+  toku_instr_rwlock_rdlock_wait_end(rwlock_instr, r);
 
-  if (rwlock->psi_rwlock != NULL)
-  {
-    locker= PSI_RWLOCK_CALL(start_rwlock_wrwait)(&state, rwlock->psi_rwlock,
-                                              PSI_RWLOCK_WRITELOCK, src_file, src_line);
-  }
+  assert_zero(r);
+}
 
+inline void toku_pthread_rwlock_wrlock_with_source_location(
+  toku_pthread_rwlock_t *rwlock, 
+  const char *src_file, uint src_line
+  )   
+{     
+  int r=0;
+
+  /* Instrumentation start */
+  toku_rwlock_instrumentation rwlock_instr;
+  toku_instr_rwlock_wrlock_wait_start(rwlock_instr, *rwlock,
+                                      src_file, src_line);
   /* Instrumented code */
   r= pthread_rwlock_wrlock(&rwlock->rwlock);
 
   /* Instrumentation end */
-  if (locker != NULL)
-      PSI_RWLOCK_CALL(end_rwlock_wrwait)(locker, r);
-#else
-  /* Non instrumented code */
-  r= pthread_rwlock_wrlock(&rwlock->rwlock);
-#endif
+  toku_instr_rwlock_wrlock_wait_end(rwlock_instr, r);
+
   assert_zero(r);
 }
 
-static inline void inline_toku_pthread_rwlock_rdunlock(
+inline void toku_pthread_rwlock_rdunlock(
   toku_pthread_rwlock_t *rwlock)
 {
   int r;
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  if (rwlock->psi_rwlock != NULL)
-    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->psi_rwlock);
-#endif
+  toku_instr_rwlock_unlock(*rwlock);
   r= pthread_rwlock_unlock(&rwlock->rwlock);
   assert_zero(r);
 }
 
-static inline void inline_toku_pthread_rwlock_wrunlock(
+inline void toku_pthread_rwlock_wrunlock(
   toku_pthread_rwlock_t *rwlock)
 {
   int r;
-#ifdef HAVE_PSI_RWLOCK_INTERFACE
-  if (rwlock->psi_rwlock != NULL)
-    PSI_RWLOCK_CALL(unlock_rwlock)(rwlock->psi_rwlock);
-#endif
+  toku_instr_rwlock_unlock(*rwlock);
   r= pthread_rwlock_unlock(&rwlock->rwlock);
   assert_zero(r);
 }
