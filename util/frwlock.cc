@@ -180,7 +180,7 @@ void frwlock::write_lock(bool expensive) {
 
 #if defined(TOKU_PFS_EXTENDED_FRWLOCKH)
   /* Instrumentation start */
-    toku_instr_rwlock_wrlock_wait_start(m_rwlock_instr, (*m_rwlock),
+    toku_instr_rwlock_wrlock_wait_start(m_rwlock_instr, m_rwlock,
                                             __FILE__, __LINE__);  
 #endif
 
@@ -253,7 +253,7 @@ bool frwlock::try_write_lock(bool expensive) {
 void frwlock::read_lock(void) {
 #if defined(TOKU_PFS_EXTENDED_FRWLOCKH)
   /* Instrumentation start */
-    toku_instr_rwlock_rdlock_wait_start(m_rwlock_instr, *m_rwlock,
+    toku_instr_rwlock_rdlock_wait_start(m_rwlock_instr, m_rwlock,
                                             __FILE__, __LINE__);  
 #endif
     toku_mutex_assert_locked(m_mutex);
@@ -322,7 +322,7 @@ void frwlock::maybe_signal_next_writer(void) {
 
 void frwlock::read_unlock(void) {
 #if defined(HAVE_PSI_RWLOCK_INTERFACE) && defined(TOKU_PFS_EXTENDED_FRWLOCKH)
-    toku_instr_rwlock_unlock(*m_rwlock);
+    toku_instr_rwlock_unlock(m_rwlock);
 #endif
     toku_mutex_assert_locked(m_mutex);
     paranoid_invariant(m_num_writers == 0);
@@ -369,7 +369,7 @@ void frwlock::maybe_signal_or_broadcast_next(void) {
 
 void frwlock::write_unlock(void) {
 #if defined(TOKU_PFS_EXTENDED_FRWLOCKH)
-    toku_instr_rwlock_unlock(*m_rwlock);
+    toku_instr_rwlock_unlock(m_rwlock);
 #endif
     toku_mutex_assert_locked(m_mutex);
     paranoid_invariant(m_num_writers == 1);

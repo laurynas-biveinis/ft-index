@@ -89,9 +89,7 @@ PATENT RIGHTS GRANT:
 #ident "Copyright (c) 2007-2013 Tokutek Inc.  All rights reserved."
 #ident "The technology is licensed by the Massachusetts Institute of Technology, Rutgers State University of New Jersey, and the Research Foundation of State University of New York at Stony Brook under United States of America Serial No. 11/760379 and to the patents and/or patent applications resulting from it."
 
-extern toku_instr_key *circular_buffer_m_lock_mutex_key;
 extern toku_instr_key *circular_buffer_m_push_cond_key;
-extern toku_instr_key *circular_buffer_m_pop_cond_key;
 
 namespace toku {
 

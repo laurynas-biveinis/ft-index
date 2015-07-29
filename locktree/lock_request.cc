@@ -96,8 +96,6 @@ PATENT RIGHTS GRANT:
 #include "locktree/lock_request.h"
 #include "util/dbt.h"
 
-toku_instr_key *lock_request_m_wait_cond_key;
-
 namespace toku {
 
 // initialize a lock request's internals

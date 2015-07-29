@@ -152,10 +152,6 @@ env_panic(DB_ENV * env, int cause, const char * msg) {
     env->i->panic_string = toku_strdup(msg);
 }
 
-toku_instr_key *result_i_open_dbs_rwlock_key;
-toku_instr_key *circular_buffer_m_push_cond_key;
-toku_instr_key *circular_buffer_m_pop_cond_key;
-
 static int env_get_engine_status_num_rows (DB_ENV * UU(env), uint64_t * num_rowsp);
 
 /********************************************************************************

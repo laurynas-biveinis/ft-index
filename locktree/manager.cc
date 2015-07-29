@@ -98,8 +98,6 @@ PATENT RIGHTS GRANT:
 
 #include <util/status.h>
 
-toku_instr_key *manager_m_escalator_done_key;
-
 namespace toku {
 
 void locktree_manager::create(lt_create_cb create_cb, lt_destroy_cb destroy_cb, lt_escalate_cb escalate_cb, void *escalate_extra) {
@@ -460,7 +458,7 @@ struct escalate_args {
 void locktree_manager::locktree_escalator::create(void) {
     ZERO_STRUCT(m_escalator_mutex);
     toku_mutex_init(*manager_escalator_mutex_key, &m_escalator_mutex, nullptr);
-    toku_cond_init(manager_m_escalator_done_key, &m_escalator_done, nullptr);
+    toku_cond_init(*manager_m_escalator_done_key, &m_escalator_done, nullptr);
     m_escalator_running = false;
 }
 

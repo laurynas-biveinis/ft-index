@@ -251,6 +251,11 @@ toku_instr_key *db_txn_struct_i_txn_mutex_key;
 toku_instr_key *indexer_i_indexer_lock_mutex_key;
 toku_instr_key *indexer_i_indexer_estimate_lock_mutex_key;
 toku_instr_key *circular_buffer_m_lock_mutex_key;
+toku_instr_key *circular_buffer_m_pop_cond_key;
+toku_instr_key *circular_buffer_m_push_cond_key;
+toku_instr_key *lock_request_m_wait_cond_key;
+toku_instr_key *manager_m_escalator_done_key;
+toku_instr_key *result_i_open_dbs_rwlock_key;
 
 static toku_instr_key *fti_probe_1_key;
 static toku_instr_key *fti_probe_2_key;
@@ -274,8 +279,6 @@ extern toku_instr_key *cachetable_m_flow_control_cond_key;
 extern toku_instr_key *cachetable_m_ev_thread_cond_key;   
 extern toku_instr_key *bfs_cond_key;
 extern toku_instr_key *result_output_condition_key;
-extern toku_instr_key *manager_m_escalator_done_key;
-extern toku_instr_key *lock_request_m_wait_cond_key;
 extern toku_instr_key *queue_result_cond_key;
 extern toku_instr_key *ws_worker_wait_key;
 extern toku_instr_key *rwlock_wait_read_key;  
@@ -286,8 +289,6 @@ extern toku_instr_key *tp_pool_wait_free_key;
 extern toku_instr_key *frwlock_m_wait_read_key;
 extern toku_instr_key *kibbutz_k_cond_key;
 extern toku_instr_key *minicron_p_condvar_key;
-extern toku_instr_key *circular_buffer_m_push_cond_key; 
-extern toku_instr_key *circular_buffer_m_pop_cond_key;  
 
 //rwlocks
 extern toku_instr_key *multi_operation_lock_key;
@@ -296,7 +297,6 @@ extern toku_instr_key *cachetable_m_list_lock_key;
 extern toku_instr_key *cachetable_m_pending_lock_expensive_key;
 extern toku_instr_key *cachetable_m_pending_lock_cheap_key;
 extern toku_instr_key *cachetable_m_lock_key;
-extern toku_instr_key *result_i_open_dbs_rwlock_key;
 extern toku_instr_key *checkpoint_safe_rwlock_key;
 extern toku_instr_key *cachetable_value_key;
 extern toku_instr_key *safe_file_size_lock_rwlock_key;

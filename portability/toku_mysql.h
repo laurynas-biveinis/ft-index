@@ -259,13 +259,13 @@ inline
 PSI_mutex* toku_instr_mutex_init(const toku_instr_key &key,
                                  toku_mutex_t &mutex)
 {
-//TODO: why before debug?
-    return PSI_MUTEX_CALL(init_mutex)(key.id(), &mutex.pmutex);
+    PSI_mutex *result = PSI_MUTEX_CALL(init_mutex)(key.id(), &mutex.pmutex);
 #if TOKU_PTHREAD_DEBUG
     mutex.instr_key_id = key.id();
     if (key.id() != PFS_NOT_INSTRUMENTED && mutex.psi_mutex == NULL )
         fprintf(stderr,"initing tokudb mutex: key: %d NULL\n", key.id());
 #endif
+    return result;
 }
 
 inline

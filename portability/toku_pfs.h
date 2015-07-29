@@ -255,6 +255,7 @@ inline
 PSI_cond* toku_instr_cond_init(UU(const toku_instr_key &key),
                                  UU(toku_cond_t &cond))
 {
+    return nullptr;
 }
 
 inline
@@ -296,6 +297,7 @@ inline
 PSI_rwlock* toku_instr_rwlock_init(UU(const toku_instr_key &key),
                                  UU(toku_pthread_rwlock_t &rwlock))
 {
+    return nullptr;
 }
 
 inline
@@ -305,15 +307,15 @@ void toku_instr_rwlock_destroy(UU(PSI_rwlock* &rwlock_instr))
 
 inline
 void toku_instr_rwlock_rdlock_wait_start(UU(toku_rwlock_instrumentation &rwlock_instr),
-                                         UU(toku_pthread_rwlock &rwlock),
+                                         UU(toku_pthread_rwlock_t &rwlock),
                                          UU(const char *src_file), UU(int src_line))
 {
 }
 
 inline
 void toku_instr_rwlock_wrlock_wait_start(UU(toku_rwlock_instrumentation &rwlock_instr),
-                                         UU(toku_pthread_rwlock &rwlock),
-                                         UU(const char *src_file), UU(int src_line)
+                                         UU(toku_pthread_rwlock_t &rwlock),
+                                         UU(const char *src_file), UU(int src_line))
 {
 }
                                               
@@ -331,7 +333,7 @@ void toku_instr_rwlock_wrlock_wait_end(UU(toku_rwlock_instrumentation &rwlock_in
 
 
 inline
-void toku_instr_rwlock_unlock(UU(toku_pthread_rwlock &rwlock))
+void toku_instr_rwlock_unlock(UU(toku_pthread_rwlock_t &rwlock))
 {
 }
 
