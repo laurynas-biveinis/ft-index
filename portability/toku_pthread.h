@@ -134,25 +134,36 @@ typedef struct toku_mutex_aligned {
 
 
 #if TOKU_PTHREAD_DEBUG
-#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true }
+#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER,\
+                                   .psi_mutex= nullptr, .owner = 0,\
+                                   .locked = false, .valid = true, .instr_key_id=0 }
 #else
-#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER }
+#  define TOKU_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER,\
+                                   .psi_mutex= nullptr }
 #endif
 
 // Darwin doesn't provide adaptive mutexes
 #if defined(__APPLE__)
 # define TOKU_MUTEX_ADAPTIVE PTHREAD_MUTEX_DEFAULT
 #  if TOKU_PTHREAD_DEBUG
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, .owner = 0, .locked = false, .valid = true }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, \
+                                             .psi_mutex= nullptr, \
+                                             .owner = 0, .locked = false, \
+                                             .valid = true, .instr_key_id=0 }
 #  else
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_MUTEX_INITIALIZER, \
+                                             .psi_mutex= nullptr }
 #  endif
 #else // __FreeBSD__, __linux__, at least
 # define TOKU_MUTEX_ADAPTIVE PTHREAD_MUTEX_ADAPTIVE_NP
 #  if TOKU_PTHREAD_DEBUG
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, .owner = 0, .locked = false, .valid = true}
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, \
+                                             .psi_mutex= nullptr, \
+                                             .owner = 0, .locked = false, .valid = true, \
+                                             .instr_key_id=0}
 #  else
-#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP }
+#   define TOKU_ADAPTIVE_MUTEX_INITIALIZER { .pmutex = PTHREAD_ADAPTIVE_MUTEX_INITIALIZER_NP, \
+                                             .psi_mutex= nullptr }
 #  endif
 #endif
 
@@ -166,10 +177,10 @@ typedef struct toku_mutex_aligned {
 # define ZERO_COND_INITIALIZER {{{0}}}
 #endif
 
-#ifdef HAVE_PSI_COND_INTERFACE
-  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER }
+#ifdef TOKU_PTHREAD_DEBUG
+  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond= nullptr, .instr_key_id=0 }
 #else
-  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER }
+  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond= nullptr }
 #endif
 
 static inline void

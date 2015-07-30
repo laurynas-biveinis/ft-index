@@ -21,43 +21,75 @@ struct PSI_mutex;
 struct PSI_cond;
 struct PSI_rwlock;
 
-struct toku_mutex_t {
-    pthread_mutex_t pmutex;
-#if TOKU_PTHREAD_DEBUG
-    pthread_t owner; // = pthread_self(); // for debugging
-    bool locked;
-    bool valid;
-#endif
-    struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
-#if TOKU_PTHREAD_DEBUG
-    pfs_key_t instr_key_id;
-#endif
-};
 
-typedef struct toku_cond {
-    pthread_cond_t pcond;
-    struct PSI_cond *psi_cond;
-#if TOKU_PTHREAD_DEBUG
-    pfs_key_t instr_key_id;
-#endif
 
-} toku_cond_t;
-
-typedef struct toku_rwlock {
-    pthread_rwlock_t rwlock;
-    struct PSI_rwlock *psi_rwlock;
-#if TOKU_PTHREAD_DEBUG
-    pfs_key_t instr_key_id;
-#endif
-} toku_pfs_rwlock_t;
-
-typedef toku_pfs_rwlock_t toku_pthread_rwlock_t;
 
 class toku_instr_key;
 
 // TODO: break this include loop
 #include <pthread.h>
 typedef pthread_mutexattr_t toku_pthread_mutexattr_t;
+
+struct toku_mutex_t {
+    pthread_mutex_t pmutex;
+    struct PSI_mutex* psi_mutex;      /* The performance schema instrumentation hook */
+#if TOKU_PTHREAD_DEBUG
+    pthread_t owner; // = pthread_self(); // for debugging
+    bool locked;
+    bool valid;
+    pfs_key_t instr_key_id;
+#endif
+
+    toku_mutex_t() :  pmutex(PTHREAD_MUTEX_INITIALIZER),
+                      psi_mutex(nullptr)
+#if TOKU_PTHREAD_DEBUG
+                      ,owner(0), 
+                      locked(false),
+                      valid(true),
+                      instr_key_id(0)
+#endif
+                      { }
+    
+};
+
+struct toku_cond_t {
+    pthread_cond_t pcond;
+    struct PSI_cond *psi_cond;
+#if TOKU_PTHREAD_DEBUG
+    pfs_key_t instr_key_id;
+#endif
+
+    toku_cond_t() : pcond(PTHREAD_COND_INITIALIZER),
+                    psi_cond(nullptr)
+#if TOKU_PTHREAD_DEBUG
+                    ,instr_key_id(0)
+#endif
+                    { }
+                                                                                              
+};
+
+struct toku_rwlock_t {
+    pthread_rwlock_t rwlock;
+    struct PSI_rwlock *psi_rwlock;
+#if TOKU_PTHREAD_DEBUG
+    pfs_key_t instr_key_id;
+#endif
+    toku_rwlock_t() : rwlock(),
+                    psi_rwlock(nullptr)
+#if TOKU_PTHREAD_DEBUG
+                    ,instr_key_id(0)
+#endif
+                    { }
+
+};
+
+typedef toku_rwlock_t toku_pthread_rwlock_t;
+
+
+
+
+
+
 
 inline
 void toku_mutex_init(const toku_instr_key &key, toku_mutex_t *mutex,
