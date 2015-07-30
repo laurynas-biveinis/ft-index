@@ -177,12 +177,6 @@ typedef struct toku_mutex_aligned {
 # define ZERO_COND_INITIALIZER {{{0}}}
 #endif
 
-#ifdef TOKU_PTHREAD_DEBUG
-  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond= nullptr, .instr_key_id=0 }
-#else
-  #define TOKU_COND_INITIALIZER {.pcond = PTHREAD_COND_INITIALIZER, .psi_cond= nullptr }
-#endif
-
 static inline void
 toku_mutexattr_init(toku_pthread_mutexattr_t *attr) {
     int r = pthread_mutexattr_init(attr);
