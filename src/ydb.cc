@@ -225,7 +225,7 @@ env_fs_poller(void *arg) {
     int in_red;    // set true to prevent certain operations (returning ENOSPC)
 
     // get the fs sizes for the home dir
-    uint64_t avail_size, total_size;
+    uint64_t avail_size=0, total_size=0;
     r = toku_get_filesystem_sizes(env->i->dir, &avail_size, NULL, &total_size);
     assert(r == 0);
     in_yellow = (avail_size < 2 * env_fs_redzone(env, total_size));
@@ -637,7 +637,7 @@ validate_env(DB_ENV * env, bool * valid_newenv, bool need_rollback_cachefile) {
     // Test for persistent environment
     path = toku_construct_full_name(2, env->i->dir, toku_product_name_strings.environmentdictionary);
     assert(path);
-    r = toku_stat(path, &buf);
+    r = toku_stat(path, &buf, toku_uninstrumented);
     if (r == 0) {
         expect_newenv = false;  // persistent info exists
     }
@@ -658,7 +658,7 @@ validate_env(DB_ENV * env, bool * valid_newenv, bool need_rollback_cachefile) {
     if (r == 0 && need_rollback_cachefile) {
         path = toku_construct_full_name(2, env->i->dir, toku_product_name_strings.rollback_cachefile);
         assert(path);
-        r = toku_stat(path, &buf);
+        r = toku_stat(path, &buf, toku_uninstrumented);
         if (r == 0) {  
             if (expect_newenv)  // rollback cachefile exists, but persistent env is missing
                 r = toku_ydb_do_error(env, ENOENT, "Persistent environment is missing\n");
@@ -683,7 +683,7 @@ validate_env(DB_ENV * env, bool * valid_newenv, bool need_rollback_cachefile) {
     if (r == 0) {
         path = toku_construct_full_name(2, env->i->dir, toku_product_name_strings.fileopsdirectory);
         assert(path);
-        r = toku_stat(path, &buf);
+        r = toku_stat(path, &buf, toku_uninstrumented);
         if (r == 0) {  
             if (expect_newenv)  // fileops directory exists, but persistent env is missing
                 r = toku_ydb_do_error(env, ENOENT, "Persistent environment is missing\n");
@@ -802,7 +802,7 @@ env_open(DB_ENV * env, const char *home, uint32_t flags, int mode) {
 
     // Verify that the home exists.
     toku_struct_stat buf;
-    r = toku_stat(home, &buf);
+    r = toku_stat(home, &buf, toku_uninstrumented);
     if (r != 0) {
         int e = get_error_errno();
         r = toku_ydb_do_error(env, e, "Error from toku_stat(\"%s\",...)\n", home);
@@ -821,9 +821,15 @@ env_open(DB_ENV * env, const char *home, uint32_t flags, int mode) {
     env->i->open_flags = flags;
     env->i->open_mode = mode;
 
+    //Instrumentation probe start
+    TOKU_PROBE_START(toku_instr_probe_1);
+
     env_setup_real_data_dir(env);
     env_setup_real_log_dir(env);
     env_setup_real_tmp_dir(env);
+
+    //Instrumentation probe stop
+    toku_instr_probe_1->stop();
 
     r = toku_single_process_lock(env->i->dir, "environment", &env->i->envdir_lockfd);
     if (r!=0) goto cleanup;
@@ -2626,7 +2632,7 @@ toku_env_create(DB_ENV ** envp, uint32_t flags) {
     result->i->open_dbs_by_dname->create();
     XMALLOC(result->i->open_dbs_by_dict_id);
     result->i->open_dbs_by_dict_id->create();
-    toku_pthread_rwlock_init(&result->i->open_dbs_rwlock, NULL);
+    toku_pthread_rwlock_init(*result_i_open_dbs_rwlock_key,&result->i->open_dbs_rwlock, NULL);
 
     *envp = result;
     r = 0;

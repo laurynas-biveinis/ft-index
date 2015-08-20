@@ -430,6 +430,9 @@ static void print_db_key_range_struct (void) {
 
 static void print_db_lsn_struct (void) {
     field_counter=0;
+    // FT-692
+    STRUCT_SETUP(DB_LSN, file, "uint32_t %s");
+    STRUCT_SETUP(DB_LSN, offset, "uint32_t %s");
     sort_and_dump_fields("db_lsn", false, NULL);
 }
 

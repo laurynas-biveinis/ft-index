@@ -45,6 +45,10 @@ Copyright (c) 2006, 2015, Percona and/or its affiliates. All rights reserved.
 #include "ft/txn/txn_manager.h"
 #include "util/status.h"
 
+toku_instr_key *txn_lock_mutex_key;
+toku_instr_key *txn_state_lock_mutex_key;
+toku_instr_key *result_state_cond_key;
+
 void 
 toku_txn_get_status(TXN_STATUS s) {
     txn_status.init();
@@ -245,14 +249,14 @@ static txn_child_manager tcm;
         .do_fsync = false,
         .force_fsync_on_commit = false,
         .do_fsync_lsn = ZERO_LSN,
-        .xa_xid = {0},
+        .xa_xid = {0, 0, 0, ""},
         .progress_poll_fun = NULL,
         .progress_poll_fun_extra = NULL,
-        .txn_lock = ZERO_MUTEX_INITIALIZER,
+        .txn_lock = TOKU_MUTEX_INITIALIZER,
         .open_fts = open_fts,
         .roll_info = roll_info,
-        .state_lock = ZERO_MUTEX_INITIALIZER,
-        .state_cond = ZERO_COND_INITIALIZER,
+        .state_lock = TOKU_MUTEX_INITIALIZER,
+        .state_cond = TOKU_COND_INITIALIZER,
         .state = TOKUTXN_LIVE,
         .num_pin = 0,
         .client_id = 0,
@@ -270,15 +274,15 @@ static txn_child_manager tcm;
         result->child_manager = parent_tokutxn->child_manager;
     }
 
-    toku_mutex_init(&result->txn_lock, nullptr);
+    toku_mutex_init(*txn_lock_mutex_key, &result->txn_lock, nullptr);
 
     toku_pthread_mutexattr_t attr;
     toku_mutexattr_init(&attr);
     toku_mutexattr_settype(&attr, TOKU_MUTEX_ADAPTIVE);
-    toku_mutex_init(&result->state_lock, &attr);
+    toku_mutex_init(*txn_state_lock_mutex_key, &result->state_lock, &attr);
     toku_mutexattr_destroy(&attr);
 
-    toku_cond_init(&result->state_cond, nullptr);
+    toku_cond_init(*result_state_cond_key,&result->state_cond, nullptr);
 
     *tokutxn = result;
 
